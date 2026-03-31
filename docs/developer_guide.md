@@ -2,6 +2,21 @@
 
 This guide gives new developers all the context to work on the Zoolanding Data Dropper Lambda.
 
+## Platform integration
+
+This Lambda is called by the Zoolanding frontend as the raw analytics collector.
+
+- Request path: `POST /analytics`
+- Frontend caller: `../zoolandingpage/src/app/shared/services/analytics.service.ts`
+- Base URL source: `environment.apiUrl` in the frontend app
+- Data written by this Lambda is intentionally raw and append-only; it is not part of the config authoring or runtime bundle flow
+
+For platform-level context, read:
+
+- `../zoolandingpage/docs/02-architecture.md`
+- `../zoolandingpage/docs/05-analytics-tracking.md`
+- `../zoolandingpage/docs/08-data-dropper-lambda.md`
+
 ## Architecture
 
 - Stateless Lambda function triggered by API Gateway (or compatible invoker) that forwards analytics payloads.

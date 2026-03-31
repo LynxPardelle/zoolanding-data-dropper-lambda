@@ -6,6 +6,17 @@ A minimal AWS Lambda that receives analytics JSON, validates it, and stores the 
 - Handler: `lambda_function.lambda_handler`
 - Target bucket: `zoolanding-data-raw` (configurable via env var `RAW_BUCKET_NAME`)
 
+## Where this fits in Zoolanding
+
+This Lambda is the raw analytics sink for the Zoolanding frontend platform.
+
+- The Angular app sends `POST` requests to `environment.apiUrl + /analytics`.
+- The frontend service boundary lives in `../zoolandingpage/src/app/shared/services/analytics.service.ts`.
+- The app-level analytics behavior and event model are documented in `../zoolandingpage/docs/05-analytics-tracking.md`.
+- Platform architecture and the relationship between this Lambda and the config/runtime services are documented in `../zoolandingpage/docs/02-architecture.md`.
+
+This repository documents the Lambda itself. The main frontend repo is the source of truth for cross-platform behavior.
+
 ## How it works
 
 - Expects an API Gateway–like event with a JSON string in `event.body`.
