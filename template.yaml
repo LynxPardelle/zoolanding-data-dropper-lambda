@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Zoolanding Data Dropper Lambda - SAM Template
+
+Parameters:
+  RawBucketName:
+    Type: String
+    Default: zoolanding-data-raw
+    Description: S3 bucket that stores raw analytics events.
+  LogLevel:
+    Type: String
+    Default: INFO
+    AllowedValues: [DEBUG, INFO, ERROR]
+    Description: Log level for the Lambda.
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Timeout: 10
+    MemorySize: 256
+    Tracing: PassThrough
+
+Resources:
+  DataDropperApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Cors:
+        AllowOrigin: "'*'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowMethods: "'POST,OPTIONS'"
+
+  DataDropperFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: lambda_function.lambda_handler
+      Description: Receives analytics payloads and stores the original JSON into a date-partitioned S3 key.
+      Environment:
+        Variables:
+          RAW_BUCKET_NAME:
+            Ref: RawBucketName
+          LOG_LEVEL:
+            Ref: LogLevel
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource:
+                Fn::Sub: arn:aws:s3:::${RawBucketName}/*
+      Events:
+        AnalyticsPost:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: DataDropperApi
+            Path: /analytics
+            Method: POST
+
+Outputs:
+  ApiUrl:
+    Description: Data dropper endpoint URL.
+    Value:
+      Fn::Sub: https://${DataDropperApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/analytics
+  FunctionName:
+    Description: Deployed Lambda function name.
+    Value:
+      Ref: DataDropperFunction

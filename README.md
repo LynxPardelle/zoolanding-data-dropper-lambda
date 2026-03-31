@@ -46,12 +46,32 @@ python .\local_test.py
 
 ## Deploy
 
-- Zip and upload (no external deps needed), or use your preferred IaC (SAM/Serverless/Terraform).
-- AWS console settings:
-  - Runtime: Python 3.13 (or 3.11)
-  - Handler: `lambda_function.lambda_handler`
-  - Env vars (optional): `RAW_BUCKET_NAME`, `LOG_LEVEL`
-  - Role policy must include `s3:PutObject` on `arn:aws:s3:::<bucket>/*`
+For repeatable deployments from this repository:
+
+```bash
+sam deploy
+```
+
+The checked-in `samconfig.toml` already targets `us-east-1` with the correct stack name and parameter overrides.
+
+The equivalent first non-interactive deployment command is:
+
+```bash
+sam deploy --stack-name zoolanding-data-dropper --region us-east-1 --capabilities CAPABILITY_IAM --resolve-s3 --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides RawBucketName=zoolanding-data-raw LogLevel=INFO
+```
+
+This repo now includes a SAM template that exposes:
+
+- `POST /analytics`
+- CORS preflight for `POST,OPTIONS`
+- output `ApiUrl` for the deployed endpoint
+
+If you still need a manual console fallback:
+
+- Runtime: Python 3.13 (or 3.11)
+- Handler: `lambda_function.lambda_handler`
+- Env vars (optional): `RAW_BUCKET_NAME`, `LOG_LEVEL`
+- Role policy must include `s3:PutObject` on `arn:aws:s3:::<bucket>/*`
 
 ## Environment variables
 
