@@ -68,10 +68,10 @@ def _get_request_id(context: Any) -> str:
     except Exception:
         reqId = None
     if isinstance(reqId, str) and len(reqId) >= 8:
-        # Per spec, use the LAST 8 characters
+        # Keep only the suffix so filenames stay short while still carrying
+        # a request-scoped uniqueness hint from the Lambda invocation.
         return reqId[-8:]
-    # Fallback to a random-ish short id without importing uuid for minimal deps
-    # Use current time ticks in ms hex last 8 chars
+    # Fallback to a short timestamp-based suffix for local or synthetic invocations.
     return hex(int(datetime.now(tz=timezone.utc).timestamp() * 1000))[-8:]
 
 
@@ -81,6 +81,7 @@ def _decode_body(event: Dict[str, Any]) -> str:
         raise ValueError("Missing body")
     is_b64 = event.get("isBase64Encoded", False)
     if is_b64:
+        # API Gateway-compatible invokers may deliver the request body as base64.
         if isinstance(body, str):
             return base64.b64decode(body).decode("utf-8")
         raise ValueError("Body is base64Encoded but not a string")
@@ -93,11 +94,14 @@ def _decode_body(event: Dict[str, Any]) -> str:
 def _normalize_timestamp_to_ms(ts: Any) -> int:
     if not isinstance(ts, (int, float)) or not math.isfinite(ts):
         raise ValueError("Missing or invalid timestamp")
+    # Accept both epoch seconds and epoch milliseconds so older or simpler
+    # clients do not need an exact timestamp unit contract.
     ts_ms = int(ts if ts >= 10**12 else ts * 1000)
     return ts_ms
 
 
 def _derive_date_parts(ts_ms: int):
+    # Use UTC for partition keys to avoid locale- or DST-dependent drift.
     dt = datetime.fromtimestamp(ts_ms / 1000.0, tz=timezone.utc)
     return dt.strftime("%Y"), dt.strftime("%m"), dt.strftime("%d")
 
@@ -107,6 +111,7 @@ def _get_s3_client():
     if S3 is not None:
         return S3
     if DRY_RUN:
+        # Local dry-runs should exercise the handler flow without requiring AWS creds.
         _log("DEBUG", "DRY_RUN enabled; skipping S3 client init")
         return None
     if boto3 is None:
@@ -162,6 +167,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         _log("DEBUG", "Derived date parts", requestId=short_reqId, yyyy=yyyy, mm=mm, dd=dd)
 
         # 5) Build S3 key
+        # Prefix by app and UTC calendar date so downstream jobs can read by
+        # app/day without scanning unrelated raw objects.
         key = f"{app_name}/{yyyy}/{mm}/{dd}/{ts_ms}-{short_reqId}.json"
 
         # 6) Upload original, unchanged body string
@@ -181,6 +188,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         else:
             try:
                 s3 = _get_s3_client()
+                # Store the raw JSON exactly as received. Any enrichment or
+                # normalization beyond the key naming belongs to later stages.
                 s3.put_object(
                     Bucket=RAW_BUCKET_NAME,
                     Key=key,
@@ -223,10 +232,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return _json_response(200, body)
 
     except ValueError as ve:
-        # Expected client-side issues
+        # Validation failures map to 400 because the caller can fix the payload.
         _log("ERROR", "Bad request", requestId=short_reqId, error=str(ve))
         return _bad_request(str(ve))
     except Exception as ex:
-        # Unexpected server-side issues
+        # Anything else is treated as an internal failure such as S3 or runtime issues.
         _log("ERROR", "Unhandled error", requestId=short_reqId, error=str(ex), stack=traceback.format_exc())
         return _server_error()

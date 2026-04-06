@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" role="img" aria-label="Zoolanding analytics system overview">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8f5ef"/>
+      <stop offset="100%" stop-color="#e7eef4"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0f3557"/>
+      <stop offset="100%" stop-color="#1d6b72"/>
+    </linearGradient>
+    <style>
+      .title { font: 700 32px 'Segoe UI', sans-serif; fill: #0f3557; }
+      .subtitle { font: 500 19px 'Segoe UI', sans-serif; fill: #405261; }
+      .label { font: 700 23px 'Segoe UI', sans-serif; fill: #ffffff; }
+      .text { font: 700 21px 'Segoe UI', sans-serif; fill: #1f2a37; }
+      .small { font: 500 17px 'Segoe UI', sans-serif; fill: #51616f; }
+      .box { fill: #ffffff; stroke: #d4dde6; stroke-width: 2; rx: 26; }
+      .api { fill: #fff7e4; stroke: #d9a441; stroke-width: 2; rx: 26; }
+      .data { fill: #e8f6f0; stroke: #1d6b72; stroke-width: 2; rx: 26; }
+      .line { stroke: #0f3557; stroke-width: 5; fill: none; marker-end: url(#arrow); }
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#0f3557"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="800" fill="url(#bg)"/>
+  <text x="70" y="82" class="title">Zoolanding analytics pipeline</text>
+  <text x="70" y="116" class="subtitle">How the landing page reaches a Python Lambda and lands in S3 as raw data</text>
+
+  <rect x="60" y="220" width="230" height="125" class="box"/>
+  <text x="175" y="264" text-anchor="middle" class="text">Browser user</text>
+  <text x="175" y="296" text-anchor="middle" class="small">
+    <tspan x="175" dy="0">Clicks, scroll,</tspan>
+    <tspan x="175" dy="22">and section views</tspan>
+  </text>
+
+  <rect x="340" y="195" width="350" height="175" class="box"/>
+  <rect x="340" y="195" width="350" height="52" rx="26" fill="url(#accent)"/>
+  <text x="515" y="229" text-anchor="middle" class="label">Angular app</text>
+  <text x="515" y="284" text-anchor="middle" class="text">AnalyticsService</text>
+  <text x="515" y="315" text-anchor="middle" class="small">
+    <tspan x="515" dy="0">Catalog, buffering, consent,</tspan>
+    <tspan x="515" dy="22">and POST /analytics transport</tspan>
+  </text>
+
+  <rect x="760" y="175" width="290" height="120" class="api"/>
+  <text x="905" y="220" text-anchor="middle" class="text">Route 53 + CloudFront</text>
+  <text x="905" y="252" text-anchor="middle" class="small">
+    <tspan x="905" dy="0">Stable DNS layer and</tspan>
+    <tspan x="905" dy="22">API custom domain</tspan>
+  </text>
+
+  <rect x="760" y="330" width="290" height="120" class="api"/>
+  <text x="905" y="376" text-anchor="middle" class="text">API Gateway</text>
+  <text x="905" y="409" text-anchor="middle" class="small">POST /analytics</text>
+
+  <rect x="1100" y="245" width="250" height="180" class="api"/>
+  <text x="1225" y="295" text-anchor="middle" class="text">Lambda</text>
+  <text x="1225" y="330" text-anchor="middle" class="small">
+    <tspan x="1225" dy="0">Validate payload</tspan>
+    <tspan x="1225" dy="22">Normalize timestamp</tspan>
+    <tspan x="1225" dy="22">Build S3 key</tspan>
+  </text>
+
+  <rect x="340" y="525" width="370" height="150" class="data"/>
+  <text x="525" y="575" text-anchor="middle" class="text">Downstream analytics</text>
+  <text x="525" y="607" text-anchor="middle" class="small">
+    <tspan x="525" dy="0">Athena, ETL, dashboards,</tspan>
+    <tspan x="525" dy="22">and daily aggregates</tspan>
+  </text>
+
+  <rect x="980" y="525" width="370" height="150" class="data"/>
+  <text x="1165" y="575" text-anchor="middle" class="text">S3 raw bucket</text>
+  <text x="1165" y="607" text-anchor="middle" class="small">
+    <tspan x="1165" dy="0">appName / YYYY / MM / DD /</tspan>
+    <tspan x="1165" dy="22">event.json</tspan>
+  </text>
+
+  <path d="M290 282 L340 282" class="line"/>
+  <path d="M690 235 L760 235" class="line"/>
+  <path d="M905 295 L905 330" class="line"/>
+  <path d="M1050 390 L1100 338" class="line"/>
+  <path d="M1225 425 L1225 500" class="line"/>
+  <path d="M980 600 L710 600" class="line"/>
+
+  <text x="700" y="735" text-anchor="middle" class="small">
+    Key design choice: keep the Lambda thin and keep the payload raw.
+  </text>
+</svg>

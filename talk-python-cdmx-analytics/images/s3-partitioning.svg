@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" role="img" aria-label="S3 partitioning strategy">
+  <defs>
+    <style>
+      .title { font: 700 32px 'Segoe UI', sans-serif; fill: #0f3557; }
+      .subtitle { font: 500 19px 'Segoe UI', sans-serif; fill: #405261; }
+      .folder { fill: #fff7e4; stroke: #d9a441; stroke-width: 2; rx: 18; }
+      .object { fill: #ffffff; stroke: #d7dfe8; stroke-width: 2; rx: 18; }
+      .benefit { fill: #ebf7f6; stroke: #1d6b72; stroke-width: 2; rx: 18; }
+      .head { font: 700 23px 'Segoe UI', sans-serif; fill: #0f3557; }
+      .body { font: 500 17px 'Segoe UI', sans-serif; fill: #42515c; }
+      .mono { font: 600 17px 'Consolas', monospace; fill: #0f3557; }
+      .line { stroke: #0f3557; stroke-width: 4; fill: none; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="800" fill="#eef3f7"/>
+  <text x="70" y="82" class="title">Why the S3 key layout matters</text>
+  <text x="70" y="116" class="subtitle">The bucket becomes easier to query and operate when the key carries structure</text>
+
+  <rect x="80" y="180" width="760" height="460" class="object"/>
+  <text x="118" y="230" class="head">Bucket: zoolanding-data-raw</text>
+
+  <rect x="120" y="280" width="240" height="72" class="folder"/>
+  <text x="150" y="325" class="mono">zoo_landing_page/</text>
+
+  <rect x="400" y="280" width="140" height="72" class="folder"/>
+  <text x="438" y="325" class="mono">2025/</text>
+
+  <rect x="580" y="280" width="120" height="72" class="folder"/>
+  <text x="615" y="325" class="mono">08/</text>
+
+  <rect x="740" y="280" width="80" height="72" class="folder"/>
+  <text x="763" y="325" class="mono">27/</text>
+
+  <rect x="180" y="430" width="570" height="92" class="object"/>
+  <text x="208" y="485" class="mono">1756276595877-567890ab.json</text>
+
+  <path d="M240 352 L240 402" class="line"/>
+  <path d="M470 352 L470 392" class="line"/>
+  <path d="M640 352 L640 392" class="line"/>
+  <path d="M780 352 L780 392" class="line"/>
+  <path d="M240 392 L780 392" class="line"/>
+
+  <rect x="920" y="200" width="380" height="120" class="benefit"/>
+  <text x="952" y="248" class="head">Easy filtering</text>
+  <text x="952" y="282" class="body">
+    <tspan x="952" dy="0">App and date already live</tspan>
+    <tspan x="952" dy="21">inside the path.</tspan>
+  </text>
+
+  <rect x="920" y="355" width="380" height="120" class="benefit"/>
+  <text x="952" y="403" class="head">Operational hygiene</text>
+  <text x="952" y="437" class="body">
+    <tspan x="952" dy="0">Lifecycle rules and exports</tspan>
+    <tspan x="952" dy="21">can target prefixes.</tspan>
+  </text>
+
+  <rect x="920" y="510" width="380" height="120" class="benefit"/>
+  <text x="952" y="558" class="head">Future analytics</text>
+  <text x="952" y="592" class="body">
+    <tspan x="952" dy="0">Athena, ETL, and daily</tspan>
+    <tspan x="952" dy="21">batches get a clean raw layout.</tspan>
+  </text>
+</svg>

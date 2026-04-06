@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" role="img" aria-label="Lambda processing flow">
+  <defs>
+    <style>
+      .title { font: 700 32px 'Segoe UI', sans-serif; fill: #0f3557; }
+      .subtitle { font: 500 19px 'Segoe UI', sans-serif; fill: #405261; }
+      .step { fill: #ffffff; stroke: #d4dde6; stroke-width: 2; rx: 24; }
+      .step2 { fill: #fff7e4; stroke: #d9a441; stroke-width: 2; rx: 24; }
+      .step3 { fill: #ebf7f6; stroke: #1d6b72; stroke-width: 2; rx: 24; }
+      .head { font: 700 22px 'Segoe UI', sans-serif; fill: #0f3557; }
+      .body { font: 500 17px 'Segoe UI', sans-serif; fill: #42515c; }
+      .caption { font: 500 16px 'Segoe UI', sans-serif; fill: #42515c; }
+      .line { stroke: #0f3557; stroke-width: 5; fill: none; marker-end: url(#arrow); }
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#0f3557"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="800" fill="#f7f5ee"/>
+  <text x="70" y="82" class="title">What the Python Lambda actually does</text>
+  <text x="70" y="116" class="subtitle">A short handler with a clear, defensive pipeline</text>
+
+  <rect x="55" y="210" width="285" height="135" class="step"/>
+  <text x="197" y="260" text-anchor="middle" class="head">1. Decode body</text>
+  <text x="197" y="292" text-anchor="middle" class="body">
+    <tspan x="197" dy="0">Accept raw JSON</tspan>
+    <tspan x="197" dy="21">or base64 content</tspan>
+  </text>
+
+  <rect x="375" y="210" width="285" height="135" class="step"/>
+  <text x="517" y="260" text-anchor="middle" class="head">2. Parse JSON</text>
+  <text x="517" y="292" text-anchor="middle" class="body">
+    <tspan x="517" dy="0">Return 400 on</tspan>
+    <tspan x="517" dy="21">invalid payload</tspan>
+  </text>
+
+  <rect x="695" y="210" width="285" height="135" class="step2"/>
+  <text x="837" y="260" text-anchor="middle" class="head">3. Validate fields</text>
+  <text x="837" y="292" text-anchor="middle" class="body">
+    <tspan x="837" dy="0">Require appName</tspan>
+    <tspan x="837" dy="21">and timestamp</tspan>
+  </text>
+
+  <rect x="1015" y="210" width="285" height="135" class="step2"/>
+  <text x="1157" y="260" text-anchor="middle" class="head">4. Normalize time</text>
+  <text x="1157" y="292" text-anchor="middle" class="body">
+    <tspan x="1157" dy="0">Seconds or milliseconds</tspan>
+    <tspan x="1157" dy="21">become epoch ms</tspan>
+  </text>
+
+  <rect x="175" y="455" width="300" height="145" class="step3"/>
+  <text x="325" y="508" text-anchor="middle" class="head">5. Derive UTC date parts</text>
+  <text x="325" y="542" text-anchor="middle" class="body">YYYY / MM / DD</text>
+
+  <rect x="550" y="455" width="300" height="145" class="step3"/>
+  <text x="700" y="508" text-anchor="middle" class="head">6. Build S3 key</text>
+  <text x="700" y="542" text-anchor="middle" class="body">
+    <tspan x="700" dy="0">appName / date /</tspan>
+    <tspan x="700" dy="21">timestamp-requestId.json</tspan>
+  </text>
+
+  <rect x="925" y="455" width="300" height="145" class="step3"/>
+  <text x="1075" y="508" text-anchor="middle" class="head">7. Put object to S3</text>
+  <text x="1075" y="542" text-anchor="middle" class="body">
+    <tspan x="1075" dy="0">Store original JSON</tspan>
+    <tspan x="1075" dy="21">unchanged</tspan>
+  </text>
+
+  <path d="M340 278 L375 278" class="line"/>
+  <path d="M660 278 L695 278" class="line"/>
+  <path d="M980 278 L1015 278" class="line"/>
+  <path d="M1157 345 L1157 395 L1075 395 L1075 455" class="line"/>
+  <path d="M925 528 L850 528" class="line"/>
+  <path d="M550 528 L475 528" class="line"/>
+
+  <text x="700" y="698" text-anchor="middle" class="caption">
+    <tspan x="700" dy="0">The Lambda does not aggregate or reshape business semantics.</tspan>
+    <tspan x="700" dy="22">It guarantees a reliable raw drop into S3.</tspan>
+  </text>
+</svg>
