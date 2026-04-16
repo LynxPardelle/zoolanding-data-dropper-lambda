@@ -74,13 +74,15 @@ style: |
   }
 ---
 
-## Analytics con Python + AWS Lambda y S3 - Alec Jonathan Montaño Romero (Lynx Pardelle)
+## Analytics con Python + AWS Lambda y S3
 
 ### Zoolandingpage y su Lambda de analytics
 
+#### Alec Jonathan Montaño Romero (Lynx Pardelle)
+
 Python CDMX
 
-TecNM Instituto Tecnológico de Gustavo A. Madero
+Muchas gracias al TecNM Instituto Tecnológico de Gustavo A. Madero por el espacio y la oportunidad.
 
 ---
 
@@ -616,7 +618,7 @@ Este patron funciona bien cuando:
 
 ## Lecciones aprendidas
 
-- Un backend pequeno y opinionado puede ser mas util que uno muy inteligente.
+- Un backend pequeño y opinionado puede ser mas util que uno muy inteligente.
 - Guardar raw data primero da flexibilidad futura.
 - La convencion de key en S3 importa mucho mas de lo que parece.
 - Tener infraestructura declarada en SAM evita drift operativo.
