@@ -5,6 +5,7 @@ applyTo: '**'
 ---
 
 - Prefer repo-local workflow skills, prompts, and vendored repo-local skills before installed global skills.
+- For shared workspace customization audits or cross-repo rollout summaries, use the community prompts in `../zoolandingpage/.github/prompts/`.
 - Default to the repo-local `karpathy-guidelines` skill for Python handler, helper, SAM template, and local harness work.
 - Invoke the repo-local `systematic-debugging` skill before fixing bugs, failing local harness runs, or unexpected behavior.
 - Use the repo-local `test-driven-development` skill for behavior-changing handler or helper code, not for docs-only or SAM-config-only edits.

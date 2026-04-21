@@ -39,6 +39,7 @@ Use this skill for work in the raw analytics Lambda.
 
 - Pair this workflow with the repo-local `karpathy-guidelines` skill for scoped implementation, `systematic-debugging` for root-cause analysis, `risk-review` for review-only asks, and `test-driven-development` for behavior-changing code.
 - Use the repo-local `zoolanding-pr-followup` skill for CI, reviewer, and merge-readiness work.
+- For shared workspace customization audits or consolidated cross-repo summaries, use the community prompts [Workspace AI Customization Audit](../../../../zoolandingpage/.github/prompts/workspace-ai-customization-audit.prompt.md) and [Workspace Change Summary](../../../../zoolandingpage/.github/prompts/workspace-change-summary.prompt.md).
 - Use the repo-local `zoolanding-production-readiness` agent for deploy-gate review and the repo-local `zoolanding-config-platform-audit` agent when a change may require coordinated updates in the frontend or sibling services.
 - Use the repo-local `sam-deploy-check` prompt before shipping contract or SAM changes.
 
