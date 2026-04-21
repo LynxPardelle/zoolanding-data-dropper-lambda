@@ -35,6 +35,12 @@ Use this skill for work in the raw analytics Lambda.
 5. Verify deployment assumptions.
    - If the change affects API shape, env vars, or IAM expectations, update `README.md` and `instructions.md` in the same diff.
 
+## Recommended Repo-Local Skills
+
+- Pair this workflow with the repo-local `karpathy-guidelines` skill for scoped implementation, `systematic-debugging` for root-cause analysis, `risk-review` for review-only asks, and `test-driven-development` for behavior-changing code.
+- Use the repo-local `zoolanding-pr-followup` skill for CI, reviewer, and merge-readiness work.
+- Use the repo-local `sam-deploy-check` prompt before shipping contract or SAM changes.
+
 ## Resources
 
 - [Validation Checklist](./references/validation-checklist.md)
