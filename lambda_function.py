@@ -3,9 +3,11 @@ import os
 import json
 import base64
 import math
-from datetime import datetime, timezone
-from typing import Any, Dict
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Mapping
 import traceback
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 try:
     import boto3  # Provided in AWS runtime; optional locally
@@ -18,6 +20,49 @@ S3 = None  # Lazy init to allow local dry-run without boto3
 RAW_BUCKET_NAME = os.getenv("RAW_BUCKET_NAME", "zoolanding-data-raw")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 DRY_RUN = os.getenv("DRY_RUN", "0") in {"1", "true", "TRUE", "yes", "YES"}
+TIMESTAMP_MS_THRESHOLD = 10**12
+
+
+@dataclass(frozen=True)
+class EventTime:
+    timestamp_ms: int
+    utc: str
+    timezone_name: str | None = None
+    local: str | None = None
+    local_date: str | None = None
+    local_hour: str | None = None
+
+    def to_response(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "timestampMs": self.timestamp_ms,
+            "utc": self.utc,
+        }
+        if self.timezone_name and self.local and self.local_date and self.local_hour:
+            payload.update(
+                {
+                    "timezone": self.timezone_name,
+                    "local": self.local,
+                    "localDate": self.local_date,
+                    "localHour": self.local_hour,
+                }
+            )
+        return payload
+
+    def to_s3_metadata(self) -> Dict[str, str]:
+        metadata = {
+            "timestamp-ms": str(self.timestamp_ms),
+            "event-time-utc": self.utc,
+        }
+        if self.timezone_name and self.local and self.local_date and self.local_hour:
+            metadata.update(
+                {
+                    "event-timezone": self.timezone_name,
+                    "event-time-local": self.local,
+                    "event-local-date": self.local_date,
+                    "event-local-hour": self.local_hour,
+                }
+            )
+        return metadata
 
 
 def _should_log(level: str) -> bool:
@@ -62,15 +107,15 @@ def _server_error() -> Dict[str, Any]:
 
 
 def _get_request_id(context: Any) -> str:
-    reqId = None
+    request_id = None
     try:
-        reqId = getattr(context, "aws_request_id", None)
+        request_id = getattr(context, "aws_request_id", None)
     except Exception:
-        reqId = None
-    if isinstance(reqId, str) and len(reqId) >= 8:
+        request_id = None
+    if isinstance(request_id, str) and len(request_id) >= 8:
         # Keep only the suffix so filenames stay short while still carrying
         # a request-scoped uniqueness hint from the Lambda invocation.
-        return reqId[-8:]
+        return request_id[-8:]
     # Fallback to a short timestamp-based suffix for local or synthetic invocations.
     return hex(int(datetime.now(tz=timezone.utc).timestamp() * 1000))[-8:]
 
@@ -79,8 +124,8 @@ def _decode_body(event: Dict[str, Any]) -> str:
     body = event.get("body")
     if body is None or body == "":
         raise ValueError("Missing body")
-    is_b64 = event.get("isBase64Encoded", False)
-    if is_b64:
+    is_base64_encoded = event.get("isBase64Encoded", False)
+    if is_base64_encoded:
         # API Gateway-compatible invokers may deliver the request body as base64.
         if isinstance(body, str):
             return base64.b64decode(body).decode("utf-8")
@@ -96,14 +141,44 @@ def _normalize_timestamp_to_ms(ts: Any) -> int:
         raise ValueError("Missing or invalid timestamp")
     # Accept both epoch seconds and epoch milliseconds so older or simpler
     # clients do not need an exact timestamp unit contract.
-    ts_ms = int(ts if ts >= 10**12 else ts * 1000)
+    ts_ms = int(ts if ts >= TIMESTAMP_MS_THRESHOLD else ts * 1000)
     return ts_ms
 
 
-def _derive_date_parts(ts_ms: int):
+def _derive_date_parts(ts_ms: int) -> tuple[str, str, str]:
     # Use UTC for partition keys to avoid locale- or DST-dependent drift.
     dt = datetime.fromtimestamp(ts_ms / 1000.0, tz=timezone.utc)
     return dt.strftime("%Y"), dt.strftime("%m"), dt.strftime("%d")
+
+
+def _format_iso(dt: datetime) -> str:
+    timespec = "milliseconds" if dt.microsecond else "seconds"
+    value = dt.isoformat(timespec=timespec)
+    if dt.utcoffset() == timedelta(0):
+        return value.replace("+00:00", "Z")
+    return value
+
+
+def _event_time_from_payload(ts_ms: int, payload: Mapping[str, Any]) -> EventTime:
+    utc_dt = datetime.fromtimestamp(ts_ms / 1000.0, tz=timezone.utc)
+    timezone_name = payload.get("timezone")
+    if not isinstance(timezone_name, str) or not timezone_name.strip():
+        return EventTime(timestamp_ms=ts_ms, utc=_format_iso(utc_dt))
+
+    timezone_name = timezone_name.strip()
+    try:
+        local_dt = utc_dt.astimezone(ZoneInfo(timezone_name))
+    except ZoneInfoNotFoundError:
+        return EventTime(timestamp_ms=ts_ms, utc=_format_iso(utc_dt))
+
+    return EventTime(
+        timestamp_ms=ts_ms,
+        utc=_format_iso(utc_dt),
+        timezone_name=timezone_name,
+        local=_format_iso(local_dt),
+        local_date=local_dt.strftime("%Y-%m-%d"),
+        local_hour=local_dt.strftime("%H"),
+    )
 
 
 def _get_s3_client():
@@ -118,72 +193,82 @@ def _get_s3_client():
         _log("ERROR", "boto3 not available and DRY_RUN is disabled; cannot upload to S3")
         raise RuntimeError("boto3 is not available and DRY_RUN is disabled; cannot upload to S3")
     S3 = boto3.client("s3")
-    try:
-        # Try a lightweight call to ensure client is usable (won't fail without creds until used)
-        _log("DEBUG", "Initialized S3 client")
-    except Exception as e:
-        _log("ERROR", "Failed to initialize S3 client", error=str(e))
+    _log("DEBUG", "Initialized S3 client")
     return S3
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    short_reqId = _get_request_id(context)
+    short_request_id = _get_request_id(context)
 
     try:
         # 1) Decode body
         body_str = _decode_body(event)
-        _log("DEBUG", "Decoded body", requestId=short_reqId, decodedLen=len(body_str))
+        _log("DEBUG", "Decoded body", requestId=short_request_id, decodedLen=len(body_str))
 
         # 2) Parse JSON
         try:
             payload = json.loads(body_str)
         except Exception as e:
-            _log("ERROR", "Invalid JSON", requestId=short_reqId, error=str(e))
+            _log("ERROR", "Invalid JSON", requestId=short_request_id, error=str(e))
             return _bad_request("Body is not valid JSON")
+        if not isinstance(payload, dict):
+            _log("ERROR", "Body JSON is not an object", requestId=short_request_id, payloadType=type(payload).__name__)
+            return _bad_request("Body JSON must be an object")
 
         # 3) Validate fields
         app_name = payload.get("appName")
         if not isinstance(app_name, str) or not app_name.strip():
-            _log("ERROR", "Invalid appName", requestId=short_reqId)
+            _log("ERROR", "Invalid appName", requestId=short_request_id)
             return _bad_request("Missing or invalid appName")
 
         try:
             ts_ms = _normalize_timestamp_to_ms(payload.get("timestamp"))
         except ValueError as e:
-            _log("ERROR", str(e), requestId=short_reqId, appName=app_name)
+            _log("ERROR", str(e), requestId=short_request_id, appName=app_name)
             return _bad_request(str(e))
         _log(
             "DEBUG",
             "Validated payload",
-            requestId=short_reqId,
+            requestId=short_request_id,
             appName=app_name,
             timestampType=type(payload.get("timestamp")).__name__,
             timestampMs=ts_ms,
             keys=list(payload.keys())[:12],
         )
 
-        # 4) Derive date parts (UTC)
+        # 4) Derive date parts (UTC) and optional viewer-local time fields.
         yyyy, mm, dd = _derive_date_parts(ts_ms)
-        _log("DEBUG", "Derived date parts", requestId=short_reqId, yyyy=yyyy, mm=mm, dd=dd)
+        event_time = _event_time_from_payload(ts_ms, payload)
+        _log(
+            "DEBUG",
+            "Derived date parts",
+            requestId=short_request_id,
+            yyyy=yyyy,
+            mm=mm,
+            dd=dd,
+            eventTime=event_time.to_response(),
+        )
 
         # 5) Build S3 key
         # Prefix by app and UTC calendar date so downstream jobs can read by
         # app/day without scanning unrelated raw objects.
-        key = f"{app_name}/{yyyy}/{mm}/{dd}/{ts_ms}-{short_reqId}.json"
+        key = f"{app_name}/{yyyy}/{mm}/{dd}/{ts_ms}-{short_request_id}.json"
 
         # 6) Upload original, unchanged body string
-        size_bytes = len(body_str.encode("utf-8"))
+        body_bytes = body_str.encode("utf-8")
+        size_bytes = len(body_bytes)
         if DRY_RUN:
             _log(
                 "INFO",
                 "Dry-run: would upload",
-                requestId=short_reqId,
+                requestId=short_request_id,
                 appName=app_name,
                 timestampMs=ts_ms,
                 bucket=RAW_BUCKET_NAME,
                 key=key,
                 size=size_bytes,
                 dryRun=True,
+                eventTime=event_time.to_response(),
             )
         else:
             try:
@@ -193,28 +278,30 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 s3.put_object(
                     Bucket=RAW_BUCKET_NAME,
                     Key=key,
-                    Body=body_str.encode("utf-8"),
+                    Body=body_bytes,
                     ContentType="application/json",
+                    Metadata=event_time.to_s3_metadata(),
                 )
                 _log(
                     "INFO",
                     "Uploaded analytics payload",
-                    requestId=short_reqId,
+                    requestId=short_request_id,
                     appName=app_name,
                     timestampMs=ts_ms,
                     bucket=RAW_BUCKET_NAME,
                     key=key,
                     size=size_bytes,
+                    eventTime=event_time.to_response(),
                 )
-            except Exception as s3e:
+            except Exception as s3_error:
                 _log(
                     "ERROR",
                     "S3 upload failed",
-                    requestId=short_reqId,
+                    requestId=short_request_id,
                     appName=app_name,
                     bucket=RAW_BUCKET_NAME,
                     key=key,
-                    error=str(s3e),
+                    error=str(s3_error),
                     stack=traceback.format_exc(),
                 )
                 # Server error for unexpected S3 failures
@@ -226,6 +313,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "bucket": RAW_BUCKET_NAME,
             "key": key,
             "size": size_bytes,
+            "eventTime": event_time.to_response(),
         }
         if DRY_RUN:
             body["dryRun"] = True
@@ -233,9 +321,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     except ValueError as ve:
         # Validation failures map to 400 because the caller can fix the payload.
-        _log("ERROR", "Bad request", requestId=short_reqId, error=str(ve))
+        _log("ERROR", "Bad request", requestId=short_request_id, error=str(ve))
         return _bad_request(str(ve))
     except Exception as ex:
         # Anything else is treated as an internal failure such as S3 or runtime issues.
-        _log("ERROR", "Unhandled error", requestId=short_reqId, error=str(ex), stack=traceback.format_exc())
+        _log("ERROR", "Unhandled error", requestId=short_request_id, error=str(ex), stack=traceback.format_exc())
         return _server_error()

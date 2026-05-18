@@ -128,6 +128,7 @@ Volver al [indice de secciones](#indice-de-secciones).
 - **IAM**: Identity and Access Management. Define permisos, por ejemplo `s3:PutObject`.
 - **Payload**: cuerpo de datos que viaja en el request.
 - **UTC**: zona horaria neutral usada para evitar ambiguedades en fechas y particiones.
+- **IANA timezone**: nombre estandar como `America/Mexico_City`; permite calcular hora local del visitante si el cliente lo envia.
 - **ETL**: Extract, Transform, Load. Proceso posterior para preparar datos para analitica.
 - **Athena**: servicio de consulta sobre datos en S3 usando SQL.
 
@@ -227,12 +228,14 @@ La Lambda de analytics solo exige dos campos:
 {
   "appName": "zoo_landing_page",
   "timestamp": 1756276595877,
+  "timezone": "America/Mexico_City",
   "name": "cta_click"
 }
 ```
 
 - `appName`: identificador estable de la app o landing.
 - `timestamp`: puede llegar en segundos o milisegundos.
+- `timezone`: opcional; si llega como zona IANA valida, la Lambda puede reportar hora local.
 - todo lo demas se conserva tal cual para analisis posterior.
 
 Eso reduce el acoplamiento entre frontend y backend.
@@ -333,10 +336,25 @@ def _derive_date_parts(ts_ms: int):
 
 ---
 
+## Paso 3b: hora local sin romper el raw
+
+```python
+local_dt = utc_dt.astimezone(ZoneInfo(timezone_name))
+```
+
+- solo se calcula si el payload trae una zona IANA valida
+- la key de S3 sigue usando UTC
+- la hora local queda en respuesta, logs y metadata del objeto
+- el JSON original no se reescribe
+
+Esto resuelve el caso de "a que hora lo vio esa persona" cuando el cliente ya envio `timezone`.
+
+---
+
 ## Paso 4: construir la key de S3
 
 ```python
-key = f"{app_name}/{yyyy}/{mm}/{dd}/{ts_ms}-{short_reqId}.json"
+key = f"{app_name}/{yyyy}/{mm}/{dd}/{ts_ms}-{short_request_id}.json"
 ```
 
 La convencion tiene varias ventajas:
@@ -362,6 +380,7 @@ s3.put_object(
     Key=key,
     Body=body_str.encode("utf-8"),
     ContentType="application/json",
+    Metadata=event_time.to_s3_metadata(),
 )
 ```
 
@@ -382,7 +401,8 @@ La decision importante es: **guardar el JSON original sin reescribirlo**.
 ```json
 {
   "appName": "zoo_landing_page",
-  "timestamp": 1756276595877,
+  "timestamp": 1756272600000,
+  "timezone": "America/Mexico_City",
   "name": "cta_click",
   "category": "cta",
   "label": "hero_primary"
@@ -393,7 +413,10 @@ La decision importante es: **guardar el JSON original sin reescribirlo**.
 
 ```text
 Bucket: zoolanding-data-raw
-Key: zoo_landing_page/2025/08/27/1756276595877-567890ab.json
+Key: zoo_landing_page/2025/08/27/1756272600000-567890ab.json
+Metadata:
+  event-time-utc: 2025-08-27T05:30:00Z
+  event-time-local: 2025-08-26T23:30:00-06:00
 ```
 
 El sufijo final depende del `aws_request_id`; aqui es ilustrativo.
@@ -555,9 +578,10 @@ Glosario rapido: [IAM](#glosario-rapido-ii), [CORS](#glosario-rapido-ii)
 1. `_decode_body` para explicar interoperabilidad con API Gateway.
 2. `_normalize_timestamp_to_ms` para hablar de clientes heterogeneos.
 3. `_derive_date_parts` para justificar UTC.
-4. construccion de `key` para explicar particionado.
-5. `put_object` para remarcar el almacenamiento raw.
-6. manejo de `ValueError` vs excepcion general.
+4. `_event_time_from_payload` para explicar `ZoneInfo` y hora local opcional.
+5. construccion de `key` para explicar particionado.
+6. `put_object` para remarcar el almacenamiento raw y metadata.
+7. manejo de `ValueError` vs excepcion general.
 
 La Lambda es corta, y eso ayuda mucho a explicarla completa en conferencia.
 
@@ -578,6 +602,7 @@ Glosario rapido: [S3](#glosario-rapido-i), [UTC](#glosario-rapido-ii)
 - Se aprecia el bucket crudo y la convencion de particiones por prefijo.
 - Esta estructura hace facil navegar por aplicacion y por fecha.
 - Es exactamente la razon por la que la key se construye con `appName/YYYY/MM/DD/...`.
+- La hora local no cambia la key: queda como metadata para no romper el particionado UTC.
 
 ---
 
@@ -621,6 +646,7 @@ Este patron funciona bien cuando:
 - Un backend pequeño y opinionado puede ser mas util que uno muy inteligente.
 - Guardar raw data primero da flexibilidad futura.
 - La convencion de key en S3 importa mucho mas de lo que parece.
+- La hora local exacta requiere que el cliente envie una zona horaria; la Lambda no debe inventarla.
 - Tener infraestructura declarada en SAM evita drift operativo.
 - Centralizar analytics en frontend reduce ruido en componentes.
 

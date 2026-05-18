@@ -22,6 +22,7 @@ Payload (JSON) must contain:
 - `appName` (string): application identifier; used as the top-level S3 prefix
 - `timestamp` (number): Unix epoch time of the event
   - Unit handling: If `timestamp >= 10^12`, treat as milliseconds; otherwise treat as seconds
+- `timezone` (string, optional): IANA timezone name from the viewer environment, for example `America/Mexico_City`
 - Any other fields: preserved and stored as-is; no schema enforced
 
 Example payload:
@@ -68,8 +69,12 @@ Example payload:
   - `timestampMs` is the timestamp normalized to milliseconds
   - `shortRequestId` is the last 8 chars of `context.aws_request_id` (or a random 8-char hex if context missing)
 - Full example key: `zoo_landing_page/2024/09/01/1725148800000-1a2b3c4d.json`
+- User metadata:
+  - Always: `timestamp-ms`, `event-time-utc`
+  - When `timezone` is a valid IANA name: `event-timezone`, `event-time-local`, `event-local-date`, `event-local-hour`
 
 Rationale: The prefix scheme enables efficient partitioned queries downstream and avoids overwrites while staying human-readable.
+The UTC key stays stable for partitioning. Local viewer time is metadata because the stored payload remains the original request body.
 
 ## Validation Rules
 
@@ -77,6 +82,7 @@ Reject the request with HTTP 400 if any is true:
 
 - `event.body` is missing or empty
 - JSON parse fails (invalid JSON)
+- Parsed JSON body is not an object
 - `appName` missing or not a non-empty string
 - `timestamp` missing or not a finite number
 
@@ -84,6 +90,7 @@ Edge handling:
 
 - Convert seconds to milliseconds if `timestamp < 10^12` (heuristic)
 - Clamp absurdly old/new timestamps only for folder derivation; still store as given (do not mutate payload)
+- If `timezone` is absent or invalid, keep the event and report only UTC-derived time fields. The Lambda cannot infer the viewer's exact local timezone without a client-provided timezone.
 
 ## Response Contract
 
@@ -94,7 +101,15 @@ Edge handling:
     "ok": true,
     "bucket": "zoolanding-data-raw",
     "key": "<final-s3-key>",
-    "size": <bytesUploaded>
+    "size": <bytesUploaded>,
+    "eventTime": {
+      "timestampMs": 1756272600000,
+      "utc": "2025-08-27T05:30:00Z",
+      "timezone": "America/Mexico_City",
+      "local": "2025-08-26T23:30:00-06:00",
+      "localDate": "2025-08-26",
+      "localHour": "23"
+    }
   }
   ```
 
@@ -161,16 +176,29 @@ def lambda_handler(event, context):
     if not isinstance(ts, (int, float)) or not math.isfinite(ts):
         return http_400('Missing or invalid timestamp')
 
-    # 4) Normalize timestamp to ms and derive date parts (UTC)
+    # 4) Normalize timestamp to ms, derive UTC date parts, and optional local time metadata
     ts_ms = int(ts if ts >= 10**12 else ts * 1000)
-    dt = datetime.utcfromtimestamp(ts_ms / 1000.0)
+    dt = datetime.fromtimestamp(ts_ms / 1000.0, tz=timezone.utc)
     yyyy, mm, dd = dt.strftime('%Y'), dt.strftime('%m'), dt.strftime('%d')
+    event_time = event_time_from_payload(ts_ms, payload)
 
     # 5) Build S3 key and upload original string body
     key = f"{app_name}/{yyyy}/{mm}/{dd}/{ts_ms}-{request_id}.json"
-    s3.put_object(Bucket=raw_bucket, Key=key, Body=body_str.encode('utf-8'), ContentType='application/json')
+    s3.put_object(
+        Bucket=raw_bucket,
+        Key=key,
+        Body=body_str.encode('utf-8'),
+        ContentType='application/json',
+        Metadata=event_time.to_s3_metadata(),
+    )
 
-  return http_200({ 'ok': True, 'bucket': raw_bucket, 'key': key, 'size': len(body_str.encode('utf-8')) })
+  return http_200({
+      'ok': True,
+      'bucket': raw_bucket,
+      'key': key,
+      'size': len(body_str.encode('utf-8')),
+      'eventTime': event_time.to_response(),
+  })
 ```
 
 ## Example API Gateway Test Event
@@ -220,6 +248,7 @@ print(lambda_handler(event, Ctx()))
 - [ ] Invalid requests return 400 with a clear error message
 - [ ] S3 key layout is exactly `appName/YYYY/MM/DD/<timestampMs>-<shortRequestId>.json`
 - [ ] Stored object body matches the original request body string byte-for-byte
+- [ ] Valid IANA `timezone` values produce viewer-local time in the response and S3 object metadata without changing the raw body
 - [ ] Logs include requestId, appName, timestampMs, and s3Key on success
 - [ ] No external dependencies beyond AWS SDK included in runtime
 

@@ -21,11 +21,13 @@ This repository documents the Lambda itself. The main frontend repo is the sourc
 
 - Expects an API Gateway–like event with a JSON string in `event.body`.
 - Validates that `appName` (string) and `timestamp` (number) exist.
-- Normalizes `timestamp` to milliseconds, derives `YYYY/MM/DD` in UTC.
+- Normalizes `timestamp` to milliseconds, derives `YYYY/MM/DD` in UTC, and reports viewer-local time when the payload includes a valid IANA `timezone`.
 - Uploads the ORIGINAL request body (unchanged) to:
   `appName/YYYY/MM/DD/<timestampMs>-<shortRequestId>.json`
+- Adds S3 object metadata for `timestamp-ms` and `event-time-utc`; when `timezone` is valid, also adds `event-timezone`, `event-time-local`, `event-local-date`, and `event-local-hour`.
 
 Details and acceptance criteria are in `instructions.md`.
+For future analytics processing, start with `docs/etl-starting-point.md`; it documents how to reconstruct timezone by `sessionId` during ETL without requiring every event to repeat `timezone`.
 
 ## Quick start (local)
 
@@ -45,6 +47,12 @@ pip install boto3
 ```powershell
 $env:DRY_RUN = "1"
 python .\local_test.py
+```
+
+- Run the unit tests:
+
+```powershell
+python -m unittest discover -s tests
 ```
 
 - To perform a real upload locally (requires configured AWS credentials), set your bucket name explicitly:
@@ -77,6 +85,8 @@ This repo now includes a SAM template that exposes:
 - CORS preflight for `POST,OPTIONS`
 - output `ApiUrl` for the deployed endpoint
 
+After `sam deploy`, make sure the shared API CloudFront front door routes `/analytics` to this SAM API origin with origin path `/Prod`. The frontend calls `https://api.zoolandingpage.com.mx/analytics`, not the raw `execute-api` output directly.
+
 If you still need a manual console fallback:
 
 - Runtime: Python 3.13 (or 3.11)
@@ -97,9 +107,12 @@ If you still need a manual console fallback:
   - Locally: `pip install boto3` or keep `DRY_RUN=1` to avoid S3 calls.
 - 400 responses:
   - Ensure `event.body` is a valid JSON string and contains `appName` (string) and `timestamp` (number).
+  - The parsed JSON body must be an object, not an array or scalar.
 - S3 key doesn't match expectations:
   - Check that `timestamp` units are correct (seconds vs milliseconds). The function converts seconds to ms automatically.
+- Local time is missing in the response or object metadata:
+  - Ensure the payload includes a valid IANA timezone such as `America/Mexico_City`. The Lambda cannot infer a viewer's exact local time from a timestamp alone.
 
 ---
 
-See `docs/developer_guide.md` for deeper details.
+See `docs/developer_guide.md` for deeper implementation details and `docs/etl-starting-point.md` for future ETL guidance.

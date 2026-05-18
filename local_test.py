@@ -17,6 +17,7 @@ class Ctx:
 sample_payload = {
     "appName": "zoo_landing_page",
     "timestamp": 1756276595877,
+    "timezone": "America/Mexico_City",
     "name": "cta_click",
 }
 

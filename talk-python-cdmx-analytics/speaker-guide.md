@@ -20,7 +20,7 @@ Mensajes clave:
 
 Si vas justo de tiempo, resume la agenda en menos de un minuto.
 
-Ahora el glosario ya vive al inicio. Usalo para nivelar a la audiencia antes de entrar en arquitectura. No leas cada definicion completa; alcanza con presentar los terminos que vas a repetir durante toda la charla: SAM, DNS, CloudFront, API Gateway, Lambda, S3, CORS, IAM y UTC.
+Ahora el glosario ya vive al inicio. Usalo para nivelar a la audiencia antes de entrar en arquitectura. No leas cada definicion completa; alcanza con presentar los terminos que vas a repetir durante toda la charla: SAM, DNS, CloudFront, API Gateway, Lambda, S3, CORS, IAM, UTC e IANA timezone.
 
 Despues del glosario ahora hay un indice navegable. Sirve para volver rapido al bloque correcto si en algun momento saltas desde una slide tecnica hacia una definicion.
 
@@ -66,7 +66,7 @@ Recorte posible:
 
 **Tiempo sugerido:** 6 minutos
 
-Muestra que el contrato minimo es deliberadamente pequeno: `appName` y `timestamp`. Todo lo adicional se conserva. Enfatiza que esto desacopla mucho el backend del tipo exacto de eventos que vaya emitiendo el frontend.
+Muestra que el contrato minimo es deliberadamente pequeno: `appName` y `timestamp`. `timezone` es opcional y solo sirve para calcular hora local cuando el cliente ya la envia. Todo lo adicional se conserva. Enfatiza que esto desacopla mucho el backend del tipo exacto de eventos que vaya emitiendo el frontend.
 
 Luego conecta eso con la existencia de la Lambda dedicada: no exponer credenciales, no hablar directo a S3 desde el navegador, y centralizar convenciones de persistencia.
 
@@ -82,26 +82,28 @@ Orden recomendado:
 2. parseo JSON y validacion minima.
 3. normalizacion de timestamp a milisegundos.
 4. derivacion de fecha en UTC.
-5. construccion de la key.
-6. `put_object` guardando el body original.
+5. hora local opcional con `ZoneInfo`, sin inventarla si no viene en el payload.
+6. construccion de la key.
+7. `put_object` guardando el body original y agregando metadata.
 
 Mensajes clave:
 
 - la Lambda no “entiende” todos los eventos, solo garantiza un raw sink confiable
 - usar UTC para particiones evita dolores posteriores
+- la hora local exacta depende de que el cliente envie una zona horaria IANA valida
 - preservar el body original es una decision de producto y de arquitectura, no un detalle accidental
 
 Recorte posible:
 
 - si el tiempo aprieta, omite la lectura textual del codigo y resume el flujo con el diagrama
 
-### Slide 19 — Ejemplo completo de payload a key
+### Slide 20 — Ejemplo completo de payload a key
 
 **Tiempo sugerido:** 4 minutos
 
-Aqui conviene detenerte un poco para que la audiencia conecte todo. Toma el JSON del lado izquierdo y explica como se transforma unicamente en naming y ubicacion, no en estructura nueva. Remarca que el contenido interno del evento no se reescribe.
+Aqui conviene detenerte un poco para que la audiencia conecte todo. Toma el JSON del lado izquierdo y explica como se transforma en naming, ubicacion y metadata, no en un JSON reescrito. Remarca que el contenido interno del evento no se reescribe.
 
-### Slides 20-33 — S3, AWS y lectura de capturas
+### Slides 21-34 — S3, AWS y lectura de capturas
 
 **Tiempo sugerido:** 18 minutos
 
@@ -127,7 +129,7 @@ Ahora ya tienes capturas reales y el tramo fue dividido en piezas mas pequenas. 
 
 Tambien ya hay una slide separada para SAM y otra para sus parametros operativos; eso te da margen para explicar IaC sin saturar una sola diapositiva.
 
-### Slides 26-30 — SAM, seguridad y demo de codigo
+### Slides 27-31 — SAM, seguridad y demo de codigo
 
 **Tiempo sugerido:** 8 minutos
 
@@ -135,7 +137,7 @@ Explica por que el template SAM importa: infraestructura declarada, menos drift,
 
 Si decides abrir el repo en vivo, esta es la mejor parte para hacerlo.
 
-### Slides 34-36 — Costos, lecciones y evoluciones
+### Slides 35-37 — Costos, lecciones y evoluciones
 
 **Tiempo sugerido:** 7 minutos
 
@@ -174,6 +176,10 @@ Porque evita perder campos nuevos y te deja rehacer transformaciones despues. Es
 ### Que sigue despues de esta arquitectura
 
 Athena, Glue, agregados diarios, dashboards o pipelines batch. La clave es que ya tienes una fuente raw confiable.
+
+### Por que la Lambda no puede saber la hora local exacta sola
+
+Porque `timestamp` solo indica un instante absoluto. Para convertirlo a hora local hace falta una zona horaria, por ejemplo `America/Mexico_City`. La Lambda puede usar `ZoneInfo` cuando ese dato llega, pero no debe inferirlo desde IP, headers incompletos o su propia region AWS.
 
 ## Material que conviene tener abierto durante la conferencia
 
