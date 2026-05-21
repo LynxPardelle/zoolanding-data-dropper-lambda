@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" role="img" aria-label="Redacted browser request diagram">
+  <defs>
+    <style>
+      .bg { fill: #f8f5ef; }
+      .title { font: 700 34px 'Segoe UI', sans-serif; fill: #102a43; }
+      .subtitle { font: 500 19px 'Segoe UI', sans-serif; fill: #405261; }
+      .panel { fill: #101820; stroke: #405261; stroke-width: 2; rx: 22; }
+      .bar { fill: #1d3345; }
+      .green { fill: #3fb950; }
+      .yellow { fill: #f2b84b; }
+      .label { font: 700 18px 'Segoe UI', sans-serif; fill: #d9e8ee; }
+      .mono { font: 600 18px 'Consolas', monospace; fill: #ffffff; }
+      .soft { font: 500 17px 'Segoe UI', sans-serif; fill: #405261; }
+      .box { fill: #ffffff; stroke: #d6dee6; stroke-width: 2; rx: 18; }
+      .head { font: 700 22px 'Segoe UI', sans-serif; fill: #102a43; }
+      .body { font: 500 17px 'Segoe UI', sans-serif; fill: #405261; }
+    </style>
+  </defs>
+  <rect width="1400" height="800" class="bg"/>
+  <text x="70" y="80" class="title">DevTools: evidencia del salto browser a AWS</text>
+  <text x="70" y="116" class="subtitle">La captura para conferencia debe estar redaccionada: sin cookies, user-agent completo, IDs ni payload personal.</text>
+
+  <rect x="80" y="170" width="640" height="410" class="panel"/>
+  <rect x="80" y="170" width="640" height="48" class="bar" rx="22"/>
+  <text x="110" y="202" class="label">Request de red</text>
+
+  <circle cx="125" cy="260" r="9" class="green"/>
+  <text x="150" y="266" class="mono">POST /analytics</text>
+  <text x="150" y="306" class="mono">Status: 200 OK</text>
+  <text x="150" y="346" class="mono">Content-Type: application/json</text>
+  <text x="150" y="386" class="mono">Payload: appName, timestamp, name</text>
+  <text x="150" y="426" class="mono">Response: ok, bucket, key, eventTime</text>
+  <circle cx="125" cy="466" r="9" class="yellow"/>
+  <text x="150" y="472" class="mono">Sensitive headers hidden</text>
+
+  <rect x="800" y="205" width="480" height="125" class="box"/>
+  <text x="840" y="255" class="head">Contrato minimo</text>
+  <text x="840" y="292" class="body">El browser manda datos suficientes para nombrar y guardar el evento.</text>
+
+  <rect x="800" y="380" width="480" height="125" class="box"/>
+  <text x="840" y="430" class="head">Responsabilidad AWS</text>
+  <text x="840" y="467" class="body">API Gateway y Lambda procesan el evento despues del POST.</text>
+
+  <text x="80" y="690" class="soft">Fuente de codigo para demo: analytics.service.ts</text>
+</svg>

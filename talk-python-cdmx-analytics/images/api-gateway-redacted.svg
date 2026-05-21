@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" role="img" aria-label="Redacted API Gateway route diagram">
+  <defs>
+    <style>
+      .bg { fill: #f8f5ef; }
+      .title { font: 700 34px 'Segoe UI', sans-serif; fill: #102a43; }
+      .subtitle { font: 500 19px 'Segoe UI', sans-serif; fill: #405261; }
+      .panel { fill: #ffffff; stroke: #d6dee6; stroke-width: 2; rx: 22; }
+      .route { fill: #fff4dc; stroke: #f2b84b; stroke-width: 2; rx: 18; }
+      .lambda { fill: #e8f7f5; stroke: #2a9d8f; stroke-width: 2; rx: 18; }
+      .head { font: 700 23px 'Segoe UI', sans-serif; fill: #102a43; }
+      .body { font: 500 17px 'Segoe UI', sans-serif; fill: #405261; }
+      .mono { font: 600 18px 'Consolas', monospace; fill: #102a43; }
+      .line { stroke: #f2b84b; stroke-width: 5; fill: none; marker-end: url(#arrow); }
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#f2b84b"/>
+    </marker>
+  </defs>
+  <rect width="1400" height="800" class="bg"/>
+  <text x="70" y="80" class="title">API Gateway: contrato HTTP explicito</text>
+  <text x="70" y="116" class="subtitle">La ruta publica se mantiene pequena: POST /analytics invoca una sola Lambda.</text>
+
+  <rect x="85" y="185" width="1180" height="455" class="panel"/>
+
+  <rect x="140" y="290" width="310" height="125" class="route"/>
+  <text x="295" y="338" text-anchor="middle" class="head">Metodo y path</text>
+  <text x="295" y="374" text-anchor="middle" class="mono">POST /analytics</text>
+
+  <rect x="545" y="290" width="310" height="125" class="route"/>
+  <text x="700" y="338" text-anchor="middle" class="head">CORS</text>
+  <text x="700" y="374" text-anchor="middle" class="mono">POST, OPTIONS</text>
+
+  <rect x="950" y="290" width="260" height="125" class="lambda"/>
+  <text x="1080" y="338" text-anchor="middle" class="head">Integracion</text>
+  <text x="1080" y="374" text-anchor="middle" class="mono">Lambda proxy</text>
+
+  <path d="M450 352 L545 352" class="line"/>
+  <path d="M855 352 L950 352" class="line"/>
+
+  <text x="135" y="505" class="body">Entrada esperada:</text>
+  <text x="300" y="505" class="mono">event.body</text>
+  <text x="410" y="505" class="body">como JSON string y</text>
+  <text x="585" y="505" class="mono">isBase64Encoded</text>
+  <text x="740" y="505" class="body">cuando aplique.</text>
+
+  <text x="135" y="555" class="body">Salida esperada:</text>
+  <text x="295" y="555" class="body">status HTTP claro: 200 para ingesta aceptada, 400 para payload corregible, 500 para falla interna.</text>
+</svg>

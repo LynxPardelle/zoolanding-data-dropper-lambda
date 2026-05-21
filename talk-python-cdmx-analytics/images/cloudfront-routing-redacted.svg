@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" role="img" aria-label="Redacted CloudFront routing diagram">
+  <defs>
+    <style>
+      .bg { fill: #f8f5ef; }
+      .title { font: 700 34px 'Segoe UI', sans-serif; fill: #102a43; }
+      .subtitle { font: 500 19px 'Segoe UI', sans-serif; fill: #405261; }
+      .panel { fill: #ffffff; stroke: #d6dee6; stroke-width: 2; rx: 22; }
+      .head { fill: #102a43; }
+      .headText { font: 700 21px 'Segoe UI', sans-serif; fill: #ffffff; }
+      .label { font: 700 22px 'Segoe UI', sans-serif; fill: #102a43; }
+      .body { font: 500 17px 'Segoe UI', sans-serif; fill: #405261; }
+      .mono { font: 600 17px 'Consolas', monospace; fill: #102a43; }
+      .tag { fill: #fff4dc; stroke: #f2b84b; stroke-width: 2; rx: 16; }
+      .line { stroke: #f2b84b; stroke-width: 5; fill: none; marker-end: url(#arrow); }
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#f2b84b"/>
+    </marker>
+  </defs>
+  <rect width="1400" height="800" class="bg"/>
+  <text x="70" y="80" class="title">CloudFront: dominio estable y ruteo por path</text>
+  <text x="70" y="116" class="subtitle">La consola real debe mostrarse redaccionada: sin account IDs, API IDs ni distribution IDs.</text>
+
+  <rect x="80" y="190" width="1180" height="430" class="panel"/>
+  <rect x="80" y="190" width="1180" height="58" class="head" rx="22"/>
+  <text x="118" y="228" class="headText">Distribution: api.zoolandingpage.com.mx</text>
+
+  <rect x="120" y="300" width="250" height="94" class="tag"/>
+  <text x="245" y="336" text-anchor="middle" class="label">Alias</text>
+  <text x="245" y="366" text-anchor="middle" class="mono">api.example.com</text>
+
+  <rect x="470" y="300" width="300" height="94" class="tag"/>
+  <text x="620" y="336" text-anchor="middle" class="label">Behavior</text>
+  <text x="620" y="366" text-anchor="middle" class="mono">/analytics</text>
+
+  <rect x="880" y="300" width="300" height="94" class="tag"/>
+  <text x="1030" y="336" text-anchor="middle" class="label">Origin</text>
+  <text x="1030" y="366" text-anchor="middle" class="mono">API Gateway /Prod</text>
+
+  <path d="M370 347 L470 347" class="line"/>
+  <path d="M770 347 L880 347" class="line"/>
+
+  <text x="130" y="475" class="body">Responsabilidad:</text>
+  <text x="270" y="475" class="body">mantener una URL publica estable y enviar solo el path correcto al origin correcto.</text>
+  <text x="130" y="520" class="body">No responsabilidad:</text>
+  <text x="292" y="520" class="body">validar payloads, escribir datos o transformar eventos.</text>
+  <text x="130" y="565" class="body">Falla comun:</text>
+  <text x="248" y="565" class="body">configurar el origin sin el path/stage esperado y romper POST /analytics.</text>
+</svg>

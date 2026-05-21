@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" role="img" aria-label="AWS serverless analytics stack for Ajolotes en la Nube">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#101820"/>
+      <stop offset="58%" stop-color="#183346"/>
+      <stop offset="100%" stop-color="#f2b84b"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f2b84b"/>
+      <stop offset="100%" stop-color="#f58220"/>
+    </linearGradient>
+    <style>
+      .title { font: 700 34px 'Segoe UI', sans-serif; fill: #ffffff; }
+      .subtitle { font: 500 18px 'Segoe UI', sans-serif; fill: #d9e8ee; }
+      .zone { fill: rgba(255,255,255,0.08); stroke: rgba(255,255,255,0.22); stroke-width: 2; rx: 28; }
+      .box { fill: #ffffff; stroke: #d6dee6; stroke-width: 2; rx: 22; }
+      .boxAws { fill: #fff7e8; stroke: #f2b84b; stroke-width: 2; rx: 22; }
+      .boxData { fill: #e8f7f5; stroke: #2a9d8f; stroke-width: 2; rx: 22; }
+      .head { font: 700 22px 'Segoe UI', sans-serif; fill: #102a43; }
+      .body { font: 500 16px 'Segoe UI', sans-serif; fill: #385163; }
+      .zoneLabel { font: 700 17px 'Segoe UI', sans-serif; fill: #f7d58a; letter-spacing: 1px; }
+      .line { stroke: #f7d58a; stroke-width: 5; fill: none; marker-end: url(#arrow); }
+      .thin { stroke: #d9e8ee; stroke-width: 3; fill: none; marker-end: url(#arrowSoft); }
+      .tag { font: 800 24px 'Segoe UI', sans-serif; fill: #ffffff; }
+      .tagBg { fill: #101820; stroke: #f2b84b; stroke-width: 3; rx: 28; }
+      .mono { font: 600 15px 'Consolas', monospace; fill: #102a43; }
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#f7d58a"/>
+    </marker>
+    <marker id="arrowSoft" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#d9e8ee"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="800" fill="url(#bg)"/>
+  <text x="70" y="82" class="title">AWS: Ajolotes en la Nube</text>
+  <text x="70" y="116" class="subtitle">Del evento del navegador al objeto original en S3</text>
+
+  <rect x="55" y="170" width="290" height="505" class="zone"/>
+  <text x="88" y="214" class="zoneLabel">CLIENTE</text>
+
+  <rect x="90" y="260" width="220" height="115" class="box"/>
+  <text x="200" y="305" text-anchor="middle" class="head">Browser</text>
+  <text x="200" y="337" text-anchor="middle" class="body">
+    <tspan x="200" dy="0">clicks, scroll,</tspan>
+    <tspan x="200" dy="20">vistas de seccion</tspan>
+  </text>
+
+  <rect x="90" y="435" width="220" height="130" class="box"/>
+  <text x="200" y="482" text-anchor="middle" class="head">Angular</text>
+  <text x="200" y="515" text-anchor="middle" class="body">
+    <tspan x="200" dy="0">AnalyticsService</tspan>
+    <tspan x="200" dy="20">POST /analytics</tspan>
+  </text>
+
+  <rect x="390" y="170" width="585" height="505" class="zone"/>
+  <text x="423" y="214" class="zoneLabel">BORDE Y COMPUTO SERVERLESS</text>
+
+  <rect x="430" y="245" width="225" height="115" class="boxAws"/>
+  <text x="542" y="291" text-anchor="middle" class="head">CloudFront</text>
+  <text x="542" y="324" text-anchor="middle" class="body">
+    <tspan x="542" dy="0">dominio estable</tspan>
+    <tspan x="542" dy="20">ruteo por path</tspan>
+  </text>
+
+  <rect x="710" y="245" width="225" height="115" class="boxAws"/>
+  <text x="822" y="291" text-anchor="middle" class="head">API Gateway</text>
+  <text x="822" y="324" text-anchor="middle" class="mono">POST /analytics</text>
+
+  <rect x="570" y="455" width="260" height="135" class="boxAws"/>
+  <text x="700" y="505" text-anchor="middle" class="head">Lambda Python</text>
+  <text x="700" y="538" text-anchor="middle" class="body">
+    <tspan x="700" dy="0">valida contrato minimo</tspan>
+    <tspan x="700" dy="20">crea key UTC para S3</tspan>
+  </text>
+
+  <rect x="1015" y="170" width="330" height="505" class="zone"/>
+  <text x="1048" y="214" class="zoneLabel">DATOS Y OPERACION</text>
+
+  <rect x="1065" y="255" width="230" height="125" class="boxData"/>
+  <text x="1180" y="303" text-anchor="middle" class="head">Bucket S3</text>
+  <text x="1180" y="336" text-anchor="middle" class="mono">
+    <tspan x="1180" dy="0">appName/YYYY/</tspan>
+    <tspan x="1180" dy="20">MM/DD/event.json</tspan>
+  </text>
+
+  <rect x="1065" y="455" width="230" height="125" class="boxData"/>
+  <text x="1180" y="503" text-anchor="middle" class="head">Capa posterior</text>
+  <text x="1180" y="536" text-anchor="middle" class="body">
+    <tspan x="1180" dy="0">ETL, Athena, Glue,</tspan>
+    <tspan x="1180" dy="20">dashboards despues</tspan>
+  </text>
+
+  <path d="M200 375 L200 435" class="thin"/>
+  <path d="M310 500 L430 302" class="line"/>
+  <path d="M655 302 L710 302" class="line"/>
+  <path d="M822 360 L735 455" class="line"/>
+  <path d="M830 522 L1065 318" class="line"/>
+  <path d="M1180 380 L1180 455" class="thin"/>
+
+  <rect x="245" y="652" width="910" height="68" class="tagBg"/>
+  <text x="700" y="695" text-anchor="middle" class="tag">Regla: Lambda valida; S3 conserva el evento original.</text>
+</svg>

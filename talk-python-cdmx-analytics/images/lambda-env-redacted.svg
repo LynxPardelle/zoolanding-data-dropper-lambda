@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" role="img" aria-label="Redacted Lambda configuration diagram">
+  <defs>
+    <style>
+      .bg { fill: #f8f5ef; }
+      .title { font: 700 34px 'Segoe UI', sans-serif; fill: #102a43; }
+      .subtitle { font: 500 19px 'Segoe UI', sans-serif; fill: #405261; }
+      .panel { fill: #ffffff; stroke: #d6dee6; stroke-width: 2; rx: 22; }
+      .row { fill: #eef4f6; stroke: #d6dee6; stroke-width: 1; rx: 12; }
+      .key { font: 700 22px 'Consolas', monospace; fill: #102a43; }
+      .value { font: 500 21px 'Segoe UI', sans-serif; fill: #405261; }
+      .body { font: 500 18px 'Segoe UI', sans-serif; fill: #405261; }
+      .tag { font: 700 16px 'Segoe UI', sans-serif; fill: #b24b00; }
+    </style>
+  </defs>
+  <rect width="1400" height="800" class="bg"/>
+  <text x="70" y="80" class="title">Lambda: configuracion fuera del codigo</text>
+  <text x="70" y="116" class="subtitle">El handler se mantiene igual; el bucket y la verbosidad cambian por variables de entorno.</text>
+
+  <rect x="120" y="190" width="1120" height="445" class="panel"/>
+  <text x="165" y="250" class="tag">Handler</text>
+  <rect x="160" y="275" width="970" height="66" class="row"/>
+  <text x="190" y="317" class="key">lambda_function.lambda_handler</text>
+
+  <text x="165" y="390" class="tag">Variables de entorno</text>
+  <rect x="160" y="415" width="970" height="66" class="row"/>
+  <text x="190" y="457" class="key">RAW_BUCKET_NAME</text>
+  <text x="510" y="457" class="value">Bucket de eventos originales</text>
+  <rect x="160" y="500" width="970" height="66" class="row"/>
+  <text x="190" y="542" class="key">LOG_LEVEL</text>
+  <text x="510" y="542" class="value">DEBUG, INFO o ERROR</text>
+
+  <text x="160" y="705" class="body">Principio operativo: no cambiar codigo para apuntar a otro bucket o ajustar nivel de logs.</text>
+</svg>

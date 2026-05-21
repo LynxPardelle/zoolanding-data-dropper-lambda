@@ -14,8 +14,8 @@
   </defs>
 
   <rect width="1400" height="800" fill="#eef3f7"/>
-  <text x="70" y="82" class="title">Why the S3 key layout matters</text>
-  <text x="70" y="116" class="subtitle">The bucket becomes easier to query and operate when the key carries structure</text>
+  <text x="70" y="82" class="title">Por que importa la key de S3</text>
+  <text x="70" y="116" class="subtitle">El bucket es mas facil de consultar y operar cuando la key tiene estructura</text>
 
   <rect x="80" y="180" width="760" height="460" class="object"/>
   <text x="118" y="230" class="head">Bucket: zoolanding-data-raw</text>
@@ -42,23 +42,23 @@
   <path d="M240 392 L780 392" class="line"/>
 
   <rect x="920" y="200" width="380" height="120" class="benefit"/>
-  <text x="952" y="248" class="head">Easy filtering</text>
+  <text x="952" y="248" class="head">Filtro simple</text>
   <text x="952" y="282" class="body">
-    <tspan x="952" dy="0">App and date already live</tspan>
-    <tspan x="952" dy="21">inside the path.</tspan>
+    <tspan x="952" dy="0">App y fecha ya viven</tspan>
+    <tspan x="952" dy="21">dentro del path.</tspan>
   </text>
 
   <rect x="920" y="355" width="380" height="120" class="benefit"/>
-  <text x="952" y="403" class="head">Operational hygiene</text>
+  <text x="952" y="403" class="head">Orden operativo</text>
   <text x="952" y="437" class="body">
-    <tspan x="952" dy="0">Lifecycle rules and exports</tspan>
-    <tspan x="952" dy="21">can target prefixes.</tspan>
+    <tspan x="952" dy="0">Lifecycle y exportaciones</tspan>
+    <tspan x="952" dy="21">pueden usar prefijos.</tspan>
   </text>
 
   <rect x="920" y="510" width="380" height="120" class="benefit"/>
-  <text x="952" y="558" class="head">Future analytics</text>
+  <text x="952" y="558" class="head">Analitica futura</text>
   <text x="952" y="592" class="body">
-    <tspan x="952" dy="0">Athena, ETL, and daily</tspan>
-    <tspan x="952" dy="21">batches get a clean raw layout.</tspan>
+    <tspan x="952" dy="0">Athena, ETL y lotes</tspan>
+    <tspan x="952" dy="21">leen una ruta ordenada.</tspan>
   </text>
 </svg>
