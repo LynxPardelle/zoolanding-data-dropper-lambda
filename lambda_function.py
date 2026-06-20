@@ -21,6 +21,21 @@ RAW_BUCKET_NAME = os.getenv("RAW_BUCKET_NAME", "zoolanding-data-raw")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 DRY_RUN = os.getenv("DRY_RUN", "0") in {"1", "true", "TRUE", "yes", "YES"}
 TIMESTAMP_MS_THRESHOLD = 10**12
+SAFE_ID_CHARS = set("abcdefghijklmnopqrstuvwxyz0123456789._-")
+BLOG_SENSITIVE_FIELDS = {
+    "email",
+    "phone",
+    "phoneNumber",
+    "password",
+    "token",
+    "accessToken",
+    "refreshToken",
+    "idToken",
+    "authorization",
+    "commentBody",
+    "message",
+    "body",
+}
 
 
 @dataclass(frozen=True)
@@ -181,6 +196,31 @@ def _event_time_from_payload(ts_ms: int, payload: Mapping[str, Any]) -> EventTim
     )
 
 
+def _safe_slug(value: Any, field_name: str) -> str:
+    slug = str(value or "").strip().lower()
+    if len(slug) < 2 or len(slug) > 80 or not all(char in SAFE_ID_CHARS for char in slug):
+        raise ValueError(f"Missing or invalid {field_name}")
+    return slug
+
+
+def _is_blog_event(payload: Mapping[str, Any]) -> bool:
+    name = str(payload.get("name") or "").strip().lower()
+    feature = str(payload.get("feature") or payload.get("contentFeature") or "").strip().lower()
+    content_type = str(payload.get("contentType") or "").strip().lower()
+    return feature == "blog" or content_type in {"blog", "blogarticle", "blog-article"} or name.startswith("blog_")
+
+
+def _validate_blog_event(payload: Mapping[str, Any]) -> None:
+    if not _is_blog_event(payload):
+        return
+
+    _safe_slug(payload.get("contentHubId") or payload.get("hubId"), "contentHubId")
+    _safe_slug(payload.get("articleId") or payload.get("slug"), "articleId")
+    for field_name in BLOG_SENSITIVE_FIELDS:
+        if field_name in payload:
+            raise ValueError(f"Blog analytics events must not include '{field_name}'")
+
+
 def _get_s3_client():
     global S3
     if S3 is not None:
@@ -223,6 +263,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         try:
             ts_ms = _normalize_timestamp_to_ms(payload.get("timestamp"))
+        except ValueError as e:
+            _log("ERROR", str(e), requestId=short_request_id, appName=app_name)
+            return _bad_request(str(e))
+        try:
+            _validate_blog_event(payload)
         except ValueError as e:
             _log("ERROR", str(e), requestId=short_request_id, appName=app_name)
             return _bad_request(str(e))

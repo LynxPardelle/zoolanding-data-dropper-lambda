@@ -1,0 +1,30 @@
+name: Deploy Dev
+
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: aws-actions/setup-sam@v3
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      - name: Test and deploy
+        run: |
+          python -m unittest discover -s tests -p "test_*.py"
+          sam validate
+          sam build --no-cached
+          sam deploy --config-env dev --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides "EnvironmentName=dev"

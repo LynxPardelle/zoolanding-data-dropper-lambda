@@ -132,6 +132,41 @@ class DataDropperLambdaTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 400)
         self.assertEqual(body, {"ok": False, "error": "Body JSON must be an object"})
 
+    def test_blog_event_requires_hub_and_article_ids(self):
+        lambda_function.DRY_RUN = True
+        payload = {
+            "appName": "zoolanding-web",
+            "timestamp": 1725148800000,
+            "name": "blog_view",
+            "feature": "blog",
+            "contentHubId": "main",
+            "articleId": "primer-post",
+        }
+
+        response = lambda_function.lambda_handler(self._event_for(json.dumps(payload)), LambdaContext())
+        body = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(body["ok"], True)
+
+    def test_blog_event_rejects_sensitive_fields(self):
+        lambda_function.DRY_RUN = True
+        payload = {
+            "appName": "zoolanding-web",
+            "timestamp": 1725148800000,
+            "name": "blog_comment_submit",
+            "feature": "blog",
+            "contentHubId": "main",
+            "articleId": "primer-post",
+            "email": "reader@example.com",
+        }
+
+        response = lambda_function.lambda_handler(self._event_for(json.dumps(payload)), LambdaContext())
+        body = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 400)
+        self.assertEqual(body["error"], "Blog analytics events must not include 'email'")
+
 
 if __name__ == "__main__":
     unittest.main()

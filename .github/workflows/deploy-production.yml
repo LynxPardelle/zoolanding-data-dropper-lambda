@@ -1,0 +1,45 @@
+name: Deploy Production
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Require test merge
+        run: |
+          set -euo pipefail
+          git fetch origin test main
+          parent_count="$(git rev-list --parents -n 1 HEAD | awk '{print NF-1}')"
+          test "$parent_count" -ge 2
+          second_parent="$(git rev-list --parents -n 1 HEAD | awk '{print $3}')"
+          git merge-base --is-ancestor "$second_parent" origin/test
+  deploy:
+    runs-on: ubuntu-latest
+    needs: guard
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: aws-actions/setup-sam@v3
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      - name: Test and deploy
+        run: |
+          python -m unittest discover -s tests -p "test_*.py"
+          sam validate
+          sam build --no-cached
+          sam deploy --config-env prod --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides "EnvironmentName=prod"

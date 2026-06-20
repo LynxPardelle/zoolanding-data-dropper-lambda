@@ -3,6 +3,11 @@ Transform: AWS::Serverless-2016-10-31
 Description: Zoolanding Data Dropper Lambda - SAM Template
 
 Parameters:
+  EnvironmentName:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, test, prod, production]
+    Description: Deployment environment name used for tags and environment-specific stack configuration.
   RawBucketName:
     Type: String
     Default: zoolanding-data-raw
@@ -19,6 +24,12 @@ Globals:
     Timeout: 10
     MemorySize: 256
     Tracing: PassThrough
+    Tags:
+      Project: Zoolandingpage
+      Component: DataDropper
+      ManagedBy: SAM
+      Environment:
+        Ref: EnvironmentName
 
 Resources:
   DataDropperApi:
@@ -40,6 +51,8 @@ Resources:
         Variables:
           RAW_BUCKET_NAME:
             Ref: RawBucketName
+          ENVIRONMENT_NAME:
+            Ref: EnvironmentName
           LOG_LEVEL:
             Ref: LogLevel
       Policies:
