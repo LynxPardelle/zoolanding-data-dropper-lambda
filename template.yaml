@@ -8,6 +8,11 @@ Parameters:
     Default: prod
     AllowedValues: [dev, test, prod, production]
     Description: Deployment environment name used for tags and environment-specific stack configuration.
+  ManageRawBucket:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Set to true for new non-production stacks that should create the raw analytics S3 bucket.
   RawBucketName:
     Type: String
     Default: zoolanding-data-raw
@@ -17,6 +22,12 @@ Parameters:
     Default: INFO
     AllowedValues: [DEBUG, INFO, ERROR]
     Description: Log level for the Lambda.
+
+Conditions:
+  ShouldManageRawBucket:
+    Fn::Equals:
+      - Ref: ManageRawBucket
+      - 'true'
 
 Globals:
   Function:
@@ -32,6 +43,34 @@ Globals:
         Ref: EnvironmentName
 
 Resources:
+  RawAnalyticsBucket:
+    Type: AWS::S3::Bucket
+    Condition: ShouldManageRawBucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName:
+        Ref: RawBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: Zoolandingpage
+        - Key: Component
+          Value: DataDropperRaw
+        - Key: ManagedBy
+          Value: SAM
+        - Key: Environment
+          Value:
+            Ref: EnvironmentName
+
   DataDropperApi:
     Type: AWS::Serverless::Api
     Properties:

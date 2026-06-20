@@ -42,4 +42,4 @@ jobs:
           python -m unittest discover -s tests -p "test_*.py"
           sam validate
           sam build --no-cached
-          sam deploy --config-env test --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides "EnvironmentName=test"
+          sam deploy --config-env test --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides "EnvironmentName=test" "ManageRawBucket=true"
