@@ -3,6 +3,7 @@ import os
 import json
 import base64
 import math
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Mapping
@@ -36,6 +37,14 @@ BLOG_SENSITIVE_FIELDS = {
     "message",
     "body",
 }
+BLOG_SENSITIVE_FIELD_KEYS = {re.sub(r"[^a-z0-9]", "", field.lower()) for field in BLOG_SENSITIVE_FIELDS}
+EMAIL_VALUE_RE = re.compile(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
+PHONE_VALUE_RE = re.compile(r"(?:\+?\d[\d\s().-]{7,}\d)")
+SECRET_VALUE_RE = re.compile(
+    r"(?:bearer\s+[a-z0-9._~+/=-]+|x-amz-signature|x-amz-credential|"
+    r"-----BEGIN |AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16})",
+    re.I,
+)
 
 
 @dataclass(frozen=True)
@@ -219,6 +228,26 @@ def _validate_blog_event(payload: Mapping[str, Any]) -> None:
     for field_name in BLOG_SENSITIVE_FIELDS:
         if field_name in payload:
             raise ValueError(f"Blog analytics events must not include '{field_name}'")
+    _reject_blog_sensitive_node(payload)
+
+
+def _reject_blog_sensitive_node(value: Any) -> None:
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            key_text = str(key)
+            key_token = re.sub(r"[^a-z0-9]", "", key_text.lower())
+            if key_token in BLOG_SENSITIVE_FIELD_KEYS:
+                raise ValueError(f"Blog analytics events must not include '{key_text}'")
+            _reject_blog_sensitive_node(child)
+        return
+    if isinstance(value, list):
+        for child in value:
+            _reject_blog_sensitive_node(child)
+        return
+    if isinstance(value, str) and (
+        EMAIL_VALUE_RE.search(value) or PHONE_VALUE_RE.search(value) or SECRET_VALUE_RE.search(value)
+    ):
+        raise ValueError("Blog analytics events must not include private values")
 
 
 def _get_s3_client():
@@ -355,8 +384,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # 7) Return success
         body = {
             "ok": True,
-            "bucket": RAW_BUCKET_NAME,
-            "key": key,
             "size": size_bytes,
             "eventTime": event_time.to_response(),
         }
