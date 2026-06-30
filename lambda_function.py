@@ -219,12 +219,30 @@ def _is_blog_event(payload: Mapping[str, Any]) -> bool:
     return feature == "blog" or content_type in {"blog", "blogarticle", "blog-article"} or name.startswith("blog_")
 
 
+def _first_blog_id_value(payload: Mapping[str, Any], *field_names: str) -> Any:
+    for field_name in field_names:
+        value = payload.get(field_name)
+        if value:
+            return value
+
+    for container_name in ("meta", "metadata"):
+        container = payload.get(container_name)
+        if not isinstance(container, Mapping):
+            continue
+        for field_name in field_names:
+            value = container.get(field_name)
+            if value:
+                return value
+
+    return None
+
+
 def _validate_blog_event(payload: Mapping[str, Any]) -> None:
     if not _is_blog_event(payload):
         return
 
-    _safe_slug(payload.get("contentHubId") or payload.get("hubId"), "contentHubId")
-    _safe_slug(payload.get("articleId") or payload.get("slug"), "articleId")
+    _safe_slug(_first_blog_id_value(payload, "contentHubId", "hubId"), "contentHubId")
+    _safe_slug(_first_blog_id_value(payload, "articleId", "slug"), "articleId")
     for field_name in BLOG_SENSITIVE_FIELDS:
         if field_name in payload:
             raise ValueError(f"Blog analytics events must not include '{field_name}'")

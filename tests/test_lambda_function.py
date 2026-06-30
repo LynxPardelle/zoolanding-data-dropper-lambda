@@ -159,6 +159,28 @@ class DataDropperLambdaTests(unittest.TestCase):
         self.assertNotIn("bucket", body)
         self.assertNotIn("key", body)
 
+    def test_blog_event_accepts_runtime_meta_ids(self):
+        lambda_function.DRY_RUN = True
+        payload = {
+            "appName": "zoolanding-web",
+            "timestamp": 1725148800000,
+            "name": "blog_view",
+            "feature": "blog",
+            "meta": {
+                "hubId": "zoosite-main",
+                "articleId": "art_runtime_public",
+                "category": "web",
+                "tags": ["seo", "builder"],
+                "path": "/blog/web/runtime-public",
+            },
+        }
+
+        response = lambda_function.lambda_handler(self._event_for(json.dumps(payload)), LambdaContext())
+        body = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(body["ok"], True)
+
     def test_blog_event_rejects_sensitive_fields(self):
         lambda_function.DRY_RUN = True
         payload = {
@@ -190,6 +212,26 @@ class DataDropperLambdaTests(unittest.TestCase):
                 "reader": {
                     "contact": "reader@example.com",
                 },
+            },
+        }
+
+        response = lambda_function.lambda_handler(self._event_for(json.dumps(payload)), LambdaContext())
+        body = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 400)
+        self.assertEqual(body["error"], "Blog analytics events must not include private values")
+
+    def test_blog_event_rejects_sensitive_values_inside_runtime_meta(self):
+        lambda_function.DRY_RUN = True
+        payload = {
+            "appName": "zoolanding-web",
+            "timestamp": 1725148800000,
+            "name": "blog_view",
+            "feature": "blog",
+            "meta": {
+                "hubId": "zoosite-main",
+                "articleId": "art_runtime_public",
+                "reader": "reader@example.com",
             },
         }
 

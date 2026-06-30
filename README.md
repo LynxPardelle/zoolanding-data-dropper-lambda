@@ -122,6 +122,19 @@ Blog events must include safe lowercase IDs:
 }
 ```
 
+The same IDs may be sent inside the frontend analytics `meta` object when the app records component/runtime events:
+
+```json
+{
+  "name": "blog_view",
+  "feature": "blog",
+  "meta": {
+    "hubId": "main",
+    "articleId": "primer-post"
+  }
+}
+```
+
 The Lambda recursively rejects blog analytics events that include obvious personal or credential fields or values such as `email`, `phone`, `password`, `token`, `authorization`, `commentBody`, `message`, `body`, email addresses, phone numbers, bearer tokens, AWS access key markers, or signed-url credential markers. Comments and forms should use a moderated feature endpoint, not raw analytics.
 
 Successful responses do not include the raw bucket name or object key; storage details remain operational and server-side.
