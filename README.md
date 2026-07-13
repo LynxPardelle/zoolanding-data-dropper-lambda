@@ -14,6 +14,7 @@ This Lambda is the raw analytics sink for the Zoolanding frontend platform.
 - The frontend service boundary lives in `../zoolandingpage/src/app/shared/services/analytics.service.ts`.
 - The app-level analytics behavior and event model are documented in `../zoolandingpage/docs/05-analytics-tracking.md`.
 - Platform architecture and the relationship between this Lambda and the config/runtime services are documented in `../zoolandingpage/docs/02-architecture.md`.
+- Blog/content hub analytics events use this same generic endpoint when they include safe `contentHubId` and `articleId` values.
 
 This repository documents the Lambda itself. The main frontend repo is the source of truth for cross-platform behavior.
 
@@ -25,6 +26,7 @@ This repository documents the Lambda itself. The main frontend repo is the sourc
 - Uploads the ORIGINAL request body (unchanged) to:
   `appName/YYYY/MM/DD/<timestampMs>-<shortRequestId>.json`
 - Adds S3 object metadata for `timestamp-ms` and `event-time-utc`; when `timezone` is valid, also adds `event-timezone`, `event-time-local`, `event-local-date`, and `event-local-hour`.
+- Rejects blog analytics events that include obvious personal or credential fields.
 
 Details and acceptance criteria are in `instructions.md`.
 For future analytics processing, start with `docs/etl-starting-point.md`; it documents how to reconstruct timezone by `sessionId` during ETL without requiring every event to repeat `timezone`.
@@ -71,7 +73,11 @@ For repeatable deployments from this repository:
 sam deploy
 ```
 
-The checked-in `samconfig.toml` already targets `us-east-1` with the correct stack name and parameter overrides.
+The checked-in `samconfig.toml` includes `dev`, `test`, and `prod` deployment profiles in `us-east-1`.
+
+- `dev` writes to `zoolanding-data-raw-dev`.
+- `test` writes to `zoolanding-data-raw-test`.
+- `prod` writes to `zoolanding-data-raw`.
 
 The equivalent first non-interactive deployment command is:
 
@@ -97,8 +103,41 @@ If you still need a manual console fallback:
 ## Environment variables
 
 - `RAW_BUCKET_NAME` (default: `zoolanding-data-raw`)
+- `ENVIRONMENT_NAME`
 - `LOG_LEVEL` = `DEBUG` | `INFO` | `ERROR` (default: `INFO`)
 - `DRY_RUN` = `1` to skip actual S3 writes (handy for local dev; ignored in production)
+
+## Blog analytics validation
+
+Events are treated as blog events when `feature` is `blog`, `contentType` is a blog/article value, or `name` starts with `blog_`.
+
+Blog events must include safe lowercase IDs:
+
+```json
+{
+  "name": "blog_view",
+  "feature": "blog",
+  "contentHubId": "main",
+  "articleId": "primer-post"
+}
+```
+
+The same IDs may be sent inside the frontend analytics `meta` object when the app records component/runtime events:
+
+```json
+{
+  "name": "blog_view",
+  "feature": "blog",
+  "meta": {
+    "hubId": "main",
+    "articleId": "primer-post"
+  }
+}
+```
+
+The Lambda recursively rejects blog analytics events that include obvious personal or credential fields or values such as `email`, `phone`, `password`, `token`, `authorization`, `commentBody`, `message`, `body`, email addresses, phone numbers, bearer tokens, AWS access key markers, or signed-url credential markers. Comments and forms should use a moderated feature endpoint, not raw analytics.
+
+Successful responses do not include the raw bucket name or object key; storage details remain operational and server-side.
 
 ## Troubleshooting
 

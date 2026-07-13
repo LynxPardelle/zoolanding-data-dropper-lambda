@@ -3,6 +3,7 @@ import os
 import json
 import base64
 import math
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Mapping
@@ -21,6 +22,29 @@ RAW_BUCKET_NAME = os.getenv("RAW_BUCKET_NAME", "zoolanding-data-raw")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 DRY_RUN = os.getenv("DRY_RUN", "0") in {"1", "true", "TRUE", "yes", "YES"}
 TIMESTAMP_MS_THRESHOLD = 10**12
+SAFE_ID_CHARS = set("abcdefghijklmnopqrstuvwxyz0123456789._-")
+BLOG_SENSITIVE_FIELDS = {
+    "email",
+    "phone",
+    "phoneNumber",
+    "password",
+    "token",
+    "accessToken",
+    "refreshToken",
+    "idToken",
+    "authorization",
+    "commentBody",
+    "message",
+    "body",
+}
+BLOG_SENSITIVE_FIELD_KEYS = {re.sub(r"[^a-z0-9]", "", field.lower()) for field in BLOG_SENSITIVE_FIELDS}
+EMAIL_VALUE_RE = re.compile(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
+PHONE_VALUE_RE = re.compile(r"(?:\+?\d[\d\s().-]{7,}\d)")
+SECRET_VALUE_RE = re.compile(
+    r"(?:bearer\s+[a-z0-9._~+/=-]+|x-amz-signature|x-amz-credential|"
+    r"-----BEGIN |AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16})",
+    re.I,
+)
 
 
 @dataclass(frozen=True)
@@ -181,6 +205,69 @@ def _event_time_from_payload(ts_ms: int, payload: Mapping[str, Any]) -> EventTim
     )
 
 
+def _safe_slug(value: Any, field_name: str) -> str:
+    slug = str(value or "").strip().lower()
+    if len(slug) < 2 or len(slug) > 80 or not all(char in SAFE_ID_CHARS for char in slug):
+        raise ValueError(f"Missing or invalid {field_name}")
+    return slug
+
+
+def _is_blog_event(payload: Mapping[str, Any]) -> bool:
+    name = str(payload.get("name") or "").strip().lower()
+    feature = str(payload.get("feature") or payload.get("contentFeature") or "").strip().lower()
+    content_type = str(payload.get("contentType") or "").strip().lower()
+    return feature == "blog" or content_type in {"blog", "blogarticle", "blog-article"} or name.startswith("blog_")
+
+
+def _first_blog_id_value(payload: Mapping[str, Any], *field_names: str) -> Any:
+    for field_name in field_names:
+        value = payload.get(field_name)
+        if value:
+            return value
+
+    for container_name in ("meta", "metadata"):
+        container = payload.get(container_name)
+        if not isinstance(container, Mapping):
+            continue
+        for field_name in field_names:
+            value = container.get(field_name)
+            if value:
+                return value
+
+    return None
+
+
+def _validate_blog_event(payload: Mapping[str, Any]) -> None:
+    if not _is_blog_event(payload):
+        return
+
+    _safe_slug(_first_blog_id_value(payload, "contentHubId", "hubId"), "contentHubId")
+    _safe_slug(_first_blog_id_value(payload, "articleId", "slug"), "articleId")
+    for field_name in BLOG_SENSITIVE_FIELDS:
+        if field_name in payload:
+            raise ValueError(f"Blog analytics events must not include '{field_name}'")
+    _reject_blog_sensitive_node(payload)
+
+
+def _reject_blog_sensitive_node(value: Any) -> None:
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            key_text = str(key)
+            key_token = re.sub(r"[^a-z0-9]", "", key_text.lower())
+            if key_token in BLOG_SENSITIVE_FIELD_KEYS:
+                raise ValueError(f"Blog analytics events must not include '{key_text}'")
+            _reject_blog_sensitive_node(child)
+        return
+    if isinstance(value, list):
+        for child in value:
+            _reject_blog_sensitive_node(child)
+        return
+    if isinstance(value, str) and (
+        EMAIL_VALUE_RE.search(value) or PHONE_VALUE_RE.search(value) or SECRET_VALUE_RE.search(value)
+    ):
+        raise ValueError("Blog analytics events must not include private values")
+
+
 def _get_s3_client():
     global S3
     if S3 is not None:
@@ -223,6 +310,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         try:
             ts_ms = _normalize_timestamp_to_ms(payload.get("timestamp"))
+        except ValueError as e:
+            _log("ERROR", str(e), requestId=short_request_id, appName=app_name)
+            return _bad_request(str(e))
+        try:
+            _validate_blog_event(payload)
         except ValueError as e:
             _log("ERROR", str(e), requestId=short_request_id, appName=app_name)
             return _bad_request(str(e))
@@ -310,8 +402,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # 7) Return success
         body = {
             "ok": True,
-            "bucket": RAW_BUCKET_NAME,
-            "key": key,
             "size": size_bytes,
             "eventTime": event_time.to_response(),
         }

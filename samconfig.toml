@@ -7,3 +7,27 @@ resolve_s3 = true
 confirm_changeset = false
 capabilities = "CAPABILITY_IAM"
 parameter_overrides = "RawBucketName=zoolanding-data-raw LogLevel=INFO"
+
+[dev.deploy.parameters]
+stack_name = "zoolanding-data-dropper-dev"
+region = "us-east-1"
+resolve_s3 = true
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "EnvironmentName=dev ManageRawBucket=true RawBucketName=zoolanding-data-raw-dev LogLevel=INFO"
+
+[test.deploy.parameters]
+stack_name = "zoolanding-data-dropper-test"
+region = "us-east-1"
+resolve_s3 = true
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "EnvironmentName=test ManageRawBucket=true RawBucketName=zoolanding-data-raw-test LogLevel=INFO"
+
+[prod.deploy.parameters]
+stack_name = "zoolanding-data-dropper"
+region = "us-east-1"
+resolve_s3 = true
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "EnvironmentName=prod ManageRawBucket=false RawBucketName=zoolanding-data-raw LogLevel=INFO"
