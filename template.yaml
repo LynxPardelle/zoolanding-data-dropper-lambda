@@ -6,7 +6,7 @@ Parameters:
   EnvironmentName:
     Type: String
     Default: prod
-    AllowedValues: [dev, test, prod, production]
+    AllowedValues: [test, prod, production]
     Description: Deployment environment name used for tags and environment-specific stack configuration.
   ManageRawBucket:
     Type: String
