@@ -76,5 +76,11 @@ jobs:
           version: 1.163.0
           use-installer: true
           token: ${{ github.token }}
-      - name: Validate SAM template
-        run: sam validate
+      - name: Build and verify exact SAM artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/build_lambda_package.py
+          sam validate --lint
+          sam build --no-cached
+          python tools/build_lambda_package.py --verify-sam-build
