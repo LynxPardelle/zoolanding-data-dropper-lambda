@@ -73,11 +73,12 @@ For repeatable deployments from this repository:
 sam deploy
 ```
 
-The checked-in `samconfig.toml` includes `dev`, `test`, and `prod` deployment profiles in `us-east-1`.
+The checked-in `samconfig.toml` includes `test` and `prod` deployment profiles in `us-east-1`.
 
-- `dev` writes to `zoolanding-data-raw-dev`.
 - `test` writes to `zoolanding-data-raw-test`.
 - `prod` writes to `zoolanding-data-raw`.
+
+Pushes to `dev` run CI only and must not provision or deploy AWS resources. Protected promotions follow `feature -> dev -> test -> main`; promotion PRs into `test` or `main` must originate in this repository. Test and production build and test without OIDC, transfer the validated SAM build through a one-day same-run artifact with a SHA-256 manifest, verify both PR parents and the protected branch tip again, and only then request AWS credentials. The OIDC job uses pinned actions, does not check out or execute repository code, and deploys only the manifest-verified build.
 
 The equivalent first non-interactive deployment command is:
 
