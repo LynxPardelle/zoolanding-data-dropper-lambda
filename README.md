@@ -67,23 +67,29 @@ python .\local_test.py
 
 ## Deploy
 
-For repeatable deployments from this repository:
+For repeatable deployments from this repository, build the runtime boundary before asking SAM to package it:
 
 ```bash
-sam deploy
+python tools/build_lambda_package.py
+sam validate --lint
+sam build --no-cached
+python tools/build_lambda_package.py --verify-sam-build
+sam deploy --template-file .aws-sam/build/template.yaml
 ```
+
+The standard-library builder copies exactly one runtime file, `lambda_function.py`, into the ignored `.build/data-dropper` directory. The post-build verifier rejects a SAM build unless it contains only that runtime file and the built template, and it also requires the built runtime bytes to match the source file.
 
 The checked-in `samconfig.toml` includes `test` and `prod` deployment profiles in `us-east-1`.
 
 - `test` writes to `zoolanding-data-raw-test`.
 - `prod` writes to `zoolanding-data-raw`.
 
-Pushes to `dev` run CI only and must not provision or deploy AWS resources. Protected promotions follow `feature -> dev -> test -> main`; promotion PRs into `test` or `main` must originate in this repository. Test and production build and test without OIDC, transfer the validated SAM build through a one-day same-run artifact with a SHA-256 manifest, verify both PR parents and the protected branch tip again, and only then request AWS credentials. The OIDC job uses pinned actions, does not check out or execute repository code, and deploys only the manifest-verified build.
+Pushes to `dev` run CI only and must not provision or deploy AWS resources. Protected promotions follow `feature -> dev -> test -> main`; promotion PRs into `test` or `main` must originate in this repository. Test and production build and test without OIDC, then export the artifact ID, coordinated name, and manifest digest for the exact validated SAM build. The OIDC job validates those outputs before downloading one artifact by immutable ID, independently verifies the manifest digest, uses strict SHA-256 checks, rejects any unexpected file, verifies both PR parents and the protected branch tip again, and only then requests AWS credentials. It uses pinned actions, does not check out or execute repository code, and deploys only the verified build. A rerun of only the failed deploy job consumes the successful validation job's exported artifact outputs; it does not recompute the artifact name from the new run attempt.
 
 The equivalent first non-interactive deployment command is:
 
 ```bash
-sam deploy --stack-name zoolanding-data-dropper --region us-east-1 --capabilities CAPABILITY_IAM --resolve-s3 --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides RawBucketName=zoolanding-data-raw LogLevel=INFO
+sam deploy --template-file .aws-sam/build/template.yaml --stack-name zoolanding-data-dropper --region us-east-1 --capabilities CAPABILITY_IAM --resolve-s3 --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides RawBucketName=zoolanding-data-raw LogLevel=INFO
 ```
 
 This repo now includes a SAM template that exposes:
