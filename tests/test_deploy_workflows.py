@@ -115,6 +115,9 @@ class DeployWorkflowTests(unittest.TestCase):
                 self.assertIn("contents: read", top_level)
                 self.assertIn("pull-requests: read", top_level)
                 self.assertNotIn("id-token: write", top_level)
+                self.assertIn("AWS_DEFAULT_REGION: us-east-1", top_level)
+                self.assertIn("AWS_REGION: us-east-1", top_level)
+                self.assertIn("SAM_CLI_TELEMETRY: 0", top_level)
                 self.assertIn("concurrency:", top_level)
                 self.assertIn(
                     f"group: data-dropper-{environment_name}-${{{{ github.repository }}}}-${{{{ github.ref }}}}",
