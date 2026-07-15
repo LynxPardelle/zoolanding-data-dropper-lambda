@@ -9,6 +9,11 @@ permissions:
   contents: read
   pull-requests: read
 
+env:
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_REGION: us-east-1
+  SAM_CLI_TELEMETRY: 0
+
 concurrency:
   group: data-dropper-production-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: false
