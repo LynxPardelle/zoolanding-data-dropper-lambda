@@ -6,22 +6,35 @@ on:
   pull_request:
     branches: [dev, test, main]
 
+permissions:
+  contents: read
+
 jobs:
   guard:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           fetch-depth: 0
       - name: Enforce promotion graph
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
             exit 0
           fi
-          base="${{ github.base_ref }}"
-          head="${{ github.head_ref }}"
+          base="$BASE_REF"
+          head="$HEAD_REF"
+          if [[ "$base" == "test" || "$base" == "main" ]] && [[ "$HEAD_REPO" != "$REPOSITORY" ]]; then
+            echo "Promotions into protected environments must come from this repository."
+            exit 1
+          fi
           if [[ "$base" == "test" && "$head" != "dev" ]]; then
             echo "Pull requests into test must come from dev."
             exit 1
@@ -38,8 +51,11 @@ jobs:
       AWS_REGION: us-east-1
       SAM_CLI_TELEMETRY: 0
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.13'
       - name: Run unit tests
@@ -55,6 +71,10 @@ jobs:
           else
             echo "No requirements.txt found; skipping dependency audit."
           fi
-      - uses: aws-actions/setup-sam@v3
+      - uses: aws-actions/setup-sam@89ddb14d60e682855e3fea4be85b3c56485de310 # v3
+        with:
+          version: 1.163.0
+          use-installer: true
+          token: ${{ github.token }}
       - name: Validate SAM template
         run: sam validate

@@ -1,45 +1,184 @@
 name: Deploy Production
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
 
 permissions:
-  id-token: write
   contents: read
+  pull-requests: read
+
+concurrency:
+  group: data-dropper-production-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  guard:
+  validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           fetch-depth: 0
-      - name: Require test merge
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+
+      - name: Verify protected target branch
+        shell: bash
+        env:
+          CURRENT_REF: ${{ github.ref }}
+          TARGET_REF: refs/heads/main
         run: |
           set -euo pipefail
-          git fetch origin test main
-          parent_count="$(git rev-list --parents -n 1 HEAD | awk '{print NF-1}')"
-          test "$parent_count" -ge 2
-          second_parent="$(git rev-list --parents -n 1 HEAD | awk '{print $3}')"
-          git merge-base --is-ancestor "$second_parent" origin/test
-  deploy:
-    runs-on: ubuntu-latest
-    needs: guard
-    environment: production
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+          if [[ "$CURRENT_REF" != "$TARGET_REF" ]]; then
+            echo "Production deploys must run from $TARGET_REF."
+            exit 1
+          fi
+
+      - name: Verify exact test-to-main merged PR
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/verify-promotion-commit.mjs --source=test --target=main
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.13'
-      - uses: aws-actions/setup-sam@v3
-      - uses: aws-actions/configure-aws-credentials@v6
+
+      - uses: aws-actions/setup-sam@89ddb14d60e682855e3fea4be85b3c56485de310 # v3
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
-      - name: Test and deploy
+          version: 1.163.0
+          use-installer: true
+          token: ${{ github.token }}
+
+      - name: Validate candidate
+        env:
+          LOG_LEVEL: ERROR
         run: |
           python -m unittest discover -s tests -p "test_*.py"
           sam validate
           sam build --no-cached
-          sam deploy --config-env prod --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides "EnvironmentName=prod" "ManageRawBucket=false"
+
+      - name: Write validated build manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd .aws-sam/build && find . -type f -print0 | sort -z | xargs -0 sha256sum) > .aws-sam/build-manifest.sha256
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: data-dropper-production-build-${{ github.sha }}
+          path: .aws-sam
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
+
+      - name: Reverify exact test-to-main merged PR after artifact creation
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/verify-promotion-commit.mjs --source=test --target=main
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: read
+    steps:
+      - uses: aws-actions/setup-sam@89ddb14d60e682855e3fea4be85b3c56485de310 # v3
+        with:
+          version: 1.163.0
+          use-installer: true
+          token: ${{ github.token }}
+
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: data-dropper-production-build-${{ github.sha }}
+          path: .aws-sam
+
+      - name: Verify validated build artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .aws-sam/build-manifest.sha256
+          (cd .aws-sam/build && sha256sum --check ../build-manifest.sha256)
+
+      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          SOURCE_BRANCH: test
+          TARGET_BRANCH: main
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fail = code => { throw new Error(code); };
+            const isSha = value => /^[a-f0-9]{40}$/.test(value ?? '');
+            const repository = process.env.GITHUB_REPOSITORY;
+            const sha = process.env.EXPECTED_SHA;
+            const sourceBranch = process.env.SOURCE_BRANCH;
+            const targetBranch = process.env.TARGET_BRANCH;
+            if (!repository || !isSha(sha) || process.env.GITHUB_REF !== `refs/heads/${targetBranch}`) {
+              fail('promotion_context_invalid');
+            }
+            const [owner, repo] = repository.split('/');
+            const { data: commit } = await github.rest.git.getCommit({ owner, repo, commit_sha: sha });
+            const parents = Array.isArray(commit.parents) ? commit.parents.map(parent => parent.sha) : [];
+            if (parents.length !== 2 || parents.some(parent => !isSha(parent))) {
+              fail('promotion_merge_commit_required');
+            }
+            let pullRequests = [];
+            for (let attempt = 1; attempt <= 3; attempt += 1) {
+              const response = await github.request('GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls', {
+                owner,
+                repo,
+                commit_sha: sha,
+                per_page: 100,
+                headers: { accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2026-03-10' },
+              });
+              pullRequests = response.data;
+              if (!Array.isArray(pullRequests) || pullRequests.length > 100) fail('promotion_api_invalid_response');
+              if (pullRequests.length > 0 || attempt === 3) break;
+              await new Promise(resolve => setTimeout(resolve, 1500));
+            }
+            const matches = pullRequests.filter(pullRequest => (
+              pullRequest?.state === 'closed'
+              && typeof pullRequest.merged_at === 'string'
+              && pullRequest.merged_at.length > 0
+              && (pullRequest.merge_commit_sha == null || pullRequest.merge_commit_sha === sha)
+              && pullRequest.base?.ref === targetBranch
+              && pullRequest.base?.repo?.full_name === repository
+              && isSha(pullRequest.base?.sha)
+              && pullRequest.head?.ref === sourceBranch
+              && pullRequest.head?.repo?.full_name === repository
+              && isSha(pullRequest.head?.sha)
+            ));
+            if (matches.length !== 1) fail(matches.length === 0 ? 'promotion_pr_not_found' : 'promotion_pr_ambiguous');
+            const pullRequest = matches[0];
+            if (parents[0] !== pullRequest.base.sha) fail('promotion_first_parent_mismatch');
+            if (parents[1] !== pullRequest.head.sha) fail('promotion_second_parent_mismatch');
+            if (context.eventName === 'push') {
+              const event = context.payload;
+              if (event.forced === true || event.created === true || event.deleted === true
+                || event.after !== sha || !isSha(event.before) || /^0+$/.test(event.before)
+                || parents[0] !== event.before) {
+                fail('promotion_push_not_allowed');
+              }
+            } else if (context.eventName !== 'workflow_dispatch') {
+              fail('promotion_event_not_allowed');
+            }
+            const { data: branch } = await github.rest.repos.getBranch({ owner, repo, branch: targetBranch });
+            if (branch.commit.sha !== sha) fail('promotion_target_tip_mismatch');
+            core.info('promotion_provenance_verified');
+
+      - uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Deploy production
+        run: sam deploy --template-file .aws-sam/build/template.yaml --stack-name zoolanding-data-dropper --region us-east-1 --resolve-s3 --capabilities CAPABILITY_IAM --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides "EnvironmentName=prod" "ManageRawBucket=false" "RawBucketName=zoolanding-data-raw" "LogLevel=INFO"
