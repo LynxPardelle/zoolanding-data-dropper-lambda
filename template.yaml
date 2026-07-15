@@ -83,7 +83,7 @@ Resources:
   DataDropperFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: .
+      CodeUri: .build/data-dropper
       Handler: lambda_function.lambda_handler
       Description: Receives analytics payloads and stores the original JSON into a date-partitioned S3 key.
       Environment:
