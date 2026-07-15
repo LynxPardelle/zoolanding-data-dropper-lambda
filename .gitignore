@@ -8,6 +8,8 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+.aws-sam/
+.build/
 build/
 develop-eggs/
 dist/

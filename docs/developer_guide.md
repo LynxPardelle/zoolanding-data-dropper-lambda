@@ -129,7 +129,9 @@ See `etl-starting-point.md` for the full starting contract.
 
 ## Deployment
 
-- Zip the repository (only Python files needed) and upload to Lambda, or deploy via SAM/Serverless/Terraform.
+- Build the exact runtime package with `python tools/build_lambda_package.py`. This standard-library builder removes stale output and writes only `lambda_function.py` under `.build/data-dropper`.
+- Run `sam validate --lint`, then `sam build --no-cached`, then `python tools/build_lambda_package.py --verify-sam-build`. The verifier requires the SAM build to contain only `DataDropperFunction/lambda_function.py` and `template.yaml`, with runtime bytes identical to the source file.
+- Deploy the verified `.aws-sam/build/template.yaml`. Do not zip the repository root because it includes non-runtime files.
 - Ensure the execution role has `s3:PutObject` on your destination bucket.
 - Configure environment variables as needed.
 

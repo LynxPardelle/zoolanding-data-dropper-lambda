@@ -21,6 +21,10 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_name: ${{ steps.artifact_metadata.outputs.name }}
+      manifest_digest: ${{ steps.manifest.outputs.digest }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -58,24 +62,48 @@ jobs:
           use-installer: true
           token: ${{ github.token }}
 
-      - name: Validate candidate
+      - name: Validate candidate and build exact artifact
+        shell: bash
         env:
           LOG_LEVEL: ERROR
         run: |
+          set -euo pipefail
           python -m unittest discover -s tests -p "test_*.py"
-          sam validate
+          python tools/build_lambda_package.py
+          sam validate --lint
           sam build --no-cached
+          python tools/build_lambda_package.py --verify-sam-build
 
       - name: Write validated build manifest
+        id: manifest
         shell: bash
         run: |
           set -euo pipefail
-          (cd .aws-sam/build && find . -type f -print0 | sort -z | xargs -0 sha256sum) > .aws-sam/build-manifest.sha256
+          (cd .aws-sam/build && LC_ALL=C find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > .aws-sam/build-manifest.sha256
+          digest="$(sha256sum .aws-sam/build-manifest.sha256 | cut -d ' ' -f 1)"
+          if [[ ! "$digest" =~ ^[a-f0-9]{64}$ ]]; then
+            echo "manifest_digest_invalid"
+            exit 1
+          fi
+          printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - name: Define artifact identity
+        id: artifact_metadata
+        shell: bash
+        env:
+          ARTIFACT_NAME: data-dropper-production-build-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+        run: |
+          set -euo pipefail
+          printf 'name=%s\n' "$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload exact validated artifact
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: data-dropper-production-build-${{ github.sha }}
-          path: .aws-sam
+          name: ${{ steps.artifact_metadata.outputs.name }}
+          path: |
+            .aws-sam/build/
+            .aws-sam/build-manifest.sha256
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 1
@@ -95,23 +123,65 @@ jobs:
       id-token: write
       pull-requests: read
     steps:
+      - name: Validate artifact handoff metadata
+        shell: bash
+        env:
+          EXPECTED_ARTIFACT_ID: ${{ needs.validate.outputs.artifact_id }}
+          EXPECTED_ARTIFACT_NAME: ${{ needs.validate.outputs.artifact_name }}
+          EXPECTED_MANIFEST_DIGEST: ${{ needs.validate.outputs.manifest_digest }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "artifact_id_invalid"
+            exit 1
+          fi
+          artifact_name_pattern="^data-dropper-production-build-${GITHUB_RUN_ID}-[1-9][0-9]*-${GITHUB_SHA}$"
+          if [[ ! "$EXPECTED_ARTIFACT_NAME" =~ $artifact_name_pattern ]]; then
+            echo "artifact_name_invalid"
+            exit 1
+          fi
+          if [[ ! "$EXPECTED_MANIFEST_DIGEST" =~ ^[a-f0-9]{64}$ ]]; then
+            echo "manifest_digest_invalid"
+            exit 1
+          fi
+
+      - name: Download validated artifact by immutable ID
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          artifact-ids: ${{ needs.validate.outputs.artifact_id }}
+          path: .aws-sam
+
+      - name: Verify validated build artifact
+        shell: bash
+        env:
+          EXPECTED_MANIFEST_DIGEST: ${{ needs.validate.outputs.manifest_digest }}
+        run: |
+          set -euo pipefail
+          test -f .aws-sam/build-manifest.sha256
+          test -f .aws-sam/build/DataDropperFunction/lambda_function.py
+          test -f .aws-sam/build/template.yaml
+          printf '%s  %s\n' "$EXPECTED_MANIFEST_DIGEST" '.aws-sam/build-manifest.sha256' \
+            | sha256sum --check --strict -
+          (cd .aws-sam/build && sha256sum --check --strict ../build-manifest.sha256)
+          printf '%s\n' \
+            './DataDropperFunction/lambda_function.py' \
+            './template.yaml' > "$RUNNER_TEMP/expected-build-files.txt"
+          cut -c67- .aws-sam/build-manifest.sha256 | LC_ALL=C sort > "$RUNNER_TEMP/manifest-paths.txt"
+          (cd .aws-sam/build && LC_ALL=C find . -type f -print | LC_ALL=C sort) > "$RUNNER_TEMP/artifact-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-build-files.txt" "$RUNNER_TEMP/manifest-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-build-files.txt" "$RUNNER_TEMP/artifact-paths.txt"
+          printf '%s\n' \
+            './build-manifest.sha256' \
+            './build/DataDropperFunction/lambda_function.py' \
+            './build/template.yaml' > "$RUNNER_TEMP/expected-artifact-files.txt"
+          (cd .aws-sam && LC_ALL=C find . -type f -print | LC_ALL=C sort) > "$RUNNER_TEMP/all-artifact-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-artifact-files.txt" "$RUNNER_TEMP/all-artifact-paths.txt"
+
       - uses: aws-actions/setup-sam@89ddb14d60e682855e3fea4be85b3c56485de310 # v3
         with:
           version: 1.163.0
           use-installer: true
           token: ${{ github.token }}
-
-      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
-        with:
-          name: data-dropper-production-build-${{ github.sha }}
-          path: .aws-sam
-
-      - name: Verify validated build artifact
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f .aws-sam/build-manifest.sha256
-          (cd .aws-sam/build && sha256sum --check ../build-manifest.sha256)
 
       - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
